@@ -78,6 +78,7 @@ def boot_gap(events: list[str], p_mkt: np.ndarray, p: np.ndarray, y: np.ndarray,
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--test-start", default="2025-12-01")
+    ap.add_argument("--prices", default=str(CACHE / "prices.json"), help="prices file (e.g. a snapshot)")
     ap.add_argument("--decision", choices=["eve", "am"], default="eve",
                     help="eve: 8pm the evening before (when the live bot trades); am: 8am on the day")
     args = ap.parse_args()
@@ -86,7 +87,7 @@ def main() -> None:
     stations = load_stations(settings.stations_file)
 
     markets = json.loads((CACHE / "markets_kept.json").read_text(encoding="utf-8"))
-    prices = {t: v[args.decision] for t, v in json.loads((CACHE / "prices.json").read_text(encoding="utf-8")).items()
+    prices = {t: v[args.decision] for t, v in json.loads(Path(args.prices).read_text(encoding="utf-8")).items()
               if v and v.get(args.decision)}
     from sqlalchemy.orm import Session
 
