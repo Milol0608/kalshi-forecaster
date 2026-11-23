@@ -162,3 +162,79 @@ class ParsedRule(Base):
     __table_args__ = (
         UniqueConstraint("ticker", "inputs_hash", "parser_version", name="uq_parsed_rules_cache_key"),
     )
+
+
+class WeatherForecastRaw(Base):
+    """One raw API response, stored as received. source: open_meteo_ensemble | open_meteo_previous_runs | nws."""
+
+    __tablename__ = "weather_forecasts_raw"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    source: Mapped[str] = mapped_column(String(32))
+    station: Mapped[str] = mapped_column(String(16))  # CLI code, e.g. CLINYC
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    params: Mapped[Any] = mapped_column(Json)
+    response: Mapped[Any] = mapped_column(Json)
+
+    __table_args__ = (Index("ix_weather_raw_station_source_fetched", "station", "source", "fetched_at"),)
+
+
+class WeatherForecastHigh(Base):
+    """Parsed daily high for one member of one model for one climate day. member 0 = control/deterministic."""
+
+    __tablename__ = "weather_forecast_highs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    raw_id: Mapped[int] = mapped_column(ForeignKey("weather_forecasts_raw.id"), index=True)
+    station: Mapped[str] = mapped_column(String(16))
+    target_date: Mapped[date] = mapped_column(Date)
+    model: Mapped[str] = mapped_column(String(48))
+    member: Mapped[int] = mapped_column(Integer)
+    high_f: Mapped[float] = mapped_column(Float)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    __table_args__ = (Index("ix_weather_highs_station_date_fetched", "station", "target_date", "fetched_at"),)
+
+
+class WeatherObservation(Base):
+    """Observed daily high from the NWS climate report (via IEM archive)."""
+
+    __tablename__ = "weather_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    station: Mapped[str] = mapped_column(String(16))
+    obs_date: Mapped[date] = mapped_column(Date)
+    high_f: Mapped[float] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(32))
+    product_id: Mapped[str | None] = mapped_column(String(64))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    # Append-only: a corrected report is a new row with a later fetched_at, so past decisions
+    # can always be replayed with exactly what was known then.
+    __table_args__ = (
+        UniqueConstraint("station", "obs_date", "source", "high_f", name="uq_weather_obs"),
+        Index("ix_weather_obs_station_date_fetched", "station", "obs_date", "fetched_at"),
+    )
+
+
+class Forecast(Base):
+    """Our probability for one market at one decision time, logged before the outcome is known."""
+
+    __tablename__ = "forecasts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    ticker: Mapped[str] = mapped_column(ForeignKey("markets.ticker"))
+    event_ticker: Mapped[str] = mapped_column(String(128), index=True)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    model_version: Mapped[str] = mapped_column(String(32))
+    inputs_hash: Mapped[str] = mapped_column(String(64))
+    probability: Mapped[float] = mapped_column(Float)
+    market_snapshot_id: Mapped[int | None] = mapped_column(ForeignKey("market_snapshots.id"))
+    yes_bid: Mapped[Decimal | None] = mapped_column(Price)
+    yes_ask: Mapped[Decimal | None] = mapped_column(Price)
+    n_members: Mapped[int] = mapped_column(Integer)
+    details: Mapped[Any] = mapped_column(Json)  # bias per model, inflation, member counts, data timestamps
+
+    __table_args__ = (Index("ix_forecasts_ticker_decided_at", "ticker", "decided_at"),)

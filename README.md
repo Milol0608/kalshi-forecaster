@@ -67,3 +67,24 @@ exactly once (`event_check_ok`). Results are cached by (ticker, hash of every in
 Boundaries (readings are whole °F): "between 49-50" is 49–50 inclusive; "less than 49" is 48 or below;
 "greater than 56" is 57 or above. Station codes are NWS climate-report IDs. Watch out: Chicago is Midway (CLIMDW),
 Dallas is DFW (CLIDFW), DC is Reagan National (CLIDCA).
+
+## Weather evidence and forecast (milestone 4)
+
+`uv run python -m app.forecast.weather_model` fetches weather, then writes one forecast per market.
+
+- **Stations:** `data/stations.json`, built by `uv run python -m scripts.build_stations`. Each CLI code maps to K+code,
+  confirmed by IEM reports carrying the same product code. Coordinates come from api.weather.gov.
+  Houston is Hobby (KHOU), NYC is Central Park (KNYC).
+- **Observed highs:** NWS climate reports via the IEM archive. These matched Kalshi's settled winning range on 270/270
+  recent days across 6 cities. Append-only: a corrected report becomes a new row.
+- **Climate day:** midnight to midnight *local standard time* (NWS convention), even during daylight saving.
+- **Forecast:** Open-Meteo ensembles, GEFS 0.25 (31 members) + ECMWF IFS 0.25 (51), hourly, max over the climate day.
+  Fetched at most every `WEATHER_FETCH_MIN_INTERVAL_MINUTES` (180).
+- **Bias:** mean(observed − day-ahead deterministic forecast) over 30 days, per station and model (Open-Meteo
+  previous-runs API). Applied to the matching ensemble. *Assumption:* deterministic-run bias stands in for ensemble bias.
+- **Model `ens-v1.1`:** bias-correct, inflate spread to each station's recent error (ADR 0004), round to whole degrees,
+  count members per range, Laplace smoothing. Only for days whose climate day hasn't started yet.
+- **NWS forecast:** stored as a reference only, not used as an input.
+- **Open-Meteo terms:** the free API is for non-commercial use, < 10,000 calls/day (we use ~1,600). Personal shadow
+  research reads as non-commercial. Trading real money for profit may not. Decide before going live: a paid plan, or
+  NOAA's public-domain GEFS files.

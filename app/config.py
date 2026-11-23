@@ -61,6 +61,15 @@ class Settings(BaseSettings):
     min_minutes_to_close: float = 60.0
     kalshi_max_requests_per_second: float = 5.0
 
+    # Weather. api.weather.gov requires a User-Agent; keep it generic (no personal contact details).
+    nws_user_agent: str = "kalshi-forecaster/0.1 (personal research)"
+    stations_file: Path = Path("data/stations.json")
+    bias_window_days: int = 30
+    min_bias_days: int = 10
+    spread_inflation: float = 1.25
+    laplace_alpha: float = 1.0
+    weather_fetch_min_interval_minutes: int = 180
+
     @property
     def market_data_base_url(self) -> str:
         """Shadow and live read production prices; demo reads the demo environment."""

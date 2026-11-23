@@ -1,0 +1,218 @@
+{
+ "CLIATL": {
+  "elevation_m": 313.0296,
+  "icao": "KATL",
+  "lat": 33.64028,
+  "lon": -84.42694,
+  "name": "Atlanta, Hartsfield - Jackson Atlanta International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/FFC/50,82/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIAUS": {
+  "elevation_m": 148.1328,
+  "icao": "KAUS",
+  "lat": 30.18304,
+  "lon": -97.67987,
+  "name": "Austin-Bergstrom International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/EWX/158,87/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLIBOS": {
+  "elevation_m": 6.096,
+  "icao": "KBOS",
+  "lat": 42.36056,
+  "lon": -71.01056,
+  "name": "Boston, Logan International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/BOX/73,101/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIDCA": {
+  "elevation_m": 3.9624,
+  "icao": "KDCA",
+  "lat": 38.84833,
+  "lon": -77.03417,
+  "name": "Washington/Reagan National Airport, DC",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/LWX/97,69/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIDEN": {
+  "elevation_m": 1647.1392,
+  "icao": "KDEN",
+  "lat": 39.84658,
+  "lon": -104.65622,
+  "name": "Denver, Denver International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/BOU/75,66/forecast",
+  "timezone": "America/Denver"
+ },
+ "CLIDFW": {
+  "elevation_m": 164.8968,
+  "icao": "KDFW",
+  "lat": 32.89743,
+  "lon": -97.02196,
+  "name": "Dallas/Fort Worth International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/FWD/81,109/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLIEWR": {
+  "elevation_m": 4.8768,
+  "icao": "KEWR",
+  "lat": 40.6825,
+  "lon": -74.16944,
+  "name": "Newark, Newark International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/OKX/28,40/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIHOU": {
+  "elevation_m": 14.0208,
+  "icao": "KHOU",
+  "lat": 29.6375,
+  "lon": -95.2825,
+  "name": "Houston, Houston Hobby Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/HGX/66,89/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLILAS": {
+  "elevation_m": 664.464,
+  "icao": "KLAS",
+  "lat": 36.07188,
+  "lon": -115.1634,
+  "name": "Harry Reid International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/VEF/121,94/forecast",
+  "timezone": "America/Los_Angeles"
+ },
+ "CLILAX": {
+  "elevation_m": 38.1,
+  "icao": "KLAX",
+  "lat": 33.93806,
+  "lon": -118.38889,
+  "name": "Los Angeles, Los Angeles International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/LOX/149,41/forecast",
+  "timezone": "America/Los_Angeles"
+ },
+ "CLIMDW": {
+  "elevation_m": 188.0616,
+  "icao": "KMDW",
+  "lat": 41.78417,
+  "lon": -87.75528,
+  "name": "Chicago, Chicago Midway Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/LOT/72,69/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLIMIA": {
+  "elevation_m": 3.048,
+  "icao": "KMIA",
+  "lat": 25.79056,
+  "lon": -80.31639,
+  "name": "Miami, Miami International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/MFL/105,51/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIMSP": {
+  "elevation_m": 256.032,
+  "icao": "KMSP",
+  "lat": 44.88306,
+  "lon": -93.22889,
+  "name": "Minneapolis, Minneapolis-St. Paul International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/MPX/110,68/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLIMSY": {
+  "elevation_m": 0.9144,
+  "icao": "KMSY",
+  "lat": 29.99278,
+  "lon": -90.25083,
+  "name": "New Orleans, New Orleans International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/LIX/61,90/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLINYC": {
+  "elevation_m": 46.9392,
+  "icao": "KNYC",
+  "lat": 40.78333,
+  "lon": -73.96667,
+  "name": "New York City, Central Park",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/OKX/34,45/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIOKC": {
+  "elevation_m": 394.1064,
+  "icao": "KOKC",
+  "lat": 35.38861,
+  "lon": -97.60028,
+  "name": "Oklahoma City, Will Rogers World Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/OUN/94,90/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLIPHL": {
+  "elevation_m": 2.1336,
+  "icao": "KPHL",
+  "lat": 39.87327,
+  "lon": -75.22678,
+  "name": "Philadelphia, Philadelphia International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/PHI/48,75/forecast",
+  "timezone": "America/New_York"
+ },
+ "CLIPHX": {
+  "elevation_m": 339.852,
+  "icao": "KPHX",
+  "lat": 33.4278,
+  "lon": -112.00347,
+  "name": "Phoenix, Phoenix Sky Harbor International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/PSR/161,57/forecast",
+  "timezone": "America/Phoenix"
+ },
+ "CLISAN": {
+  "elevation_m": 3.9624,
+  "icao": "KSAN",
+  "lat": 32.73361,
+  "lon": -117.18306,
+  "name": "San Diego International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/SGX/56,15/forecast",
+  "timezone": "America/Los_Angeles"
+ },
+ "CLISAT": {
+  "elevation_m": 245.9736,
+  "icao": "KSAT",
+  "lat": 29.53278,
+  "lon": -98.46361,
+  "name": "San Antonio, San Antonio International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/EWX/128,59/forecast",
+  "timezone": "America/Chicago"
+ },
+ "CLISDF": {
+  "elevation_m": 152.4,
+  "icao": "KSDF",
+  "lat": 38.17406,
+  "lon": -85.7365,
+  "name": "Louisville Muhammad Ali International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/LMK/51,74/forecast",
+  "timezone": "America/Kentucky/Louisville"
+ },
+ "CLISEA": {
+  "elevation_m": 130.1496,
+  "icao": "KSEA",
+  "lat": 47.44472,
+  "lon": -122.31361,
+  "name": "Seattle, Seattle-Tacoma International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/SEW/124,60/forecast",
+  "timezone": "America/Los_Angeles"
+ },
+ "CLISFO": {
+  "elevation_m": 3.048,
+  "icao": "KSFO",
+  "lat": 37.61961,
+  "lon": -122.36558,
+  "name": "San Francisco, San Francisco International Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/MTR/85,98/forecast",
+  "timezone": "America/Los_Angeles"
+ },
+ "CLITTN": {
+  "elevation_m": 64.008,
+  "icao": "KTTN",
+  "lat": 40.27639,
+  "lon": -74.81639,
+  "name": "Trenton-Mercer Airport",
+  "nws_forecast_url": "https://api.weather.gov/gridpoints/PHI/60,95/forecast",
+  "timezone": "America/New_York"
+ }
+}
