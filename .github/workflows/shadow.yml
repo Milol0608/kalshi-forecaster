@@ -33,8 +33,17 @@ jobs:
         run: uv sync --frozen --no-dev
 
       - name: Check database secret
+        # Prints only yes/no facts about the secret's shape and its length, never any part of it.
         run: |
-          if [ -z "$DATABASE_URL" ]; then echo "::error::Add the DATABASE_URL repository secret (see docs/HOSTING.md)"; exit 1; fi
+          v="$DATABASE_URL"
+          if [ -z "$v" ]; then echo "::error::Add the DATABASE_URL repository secret (see docs/HOSTING.md)"; exit 1; fi
+          yn() { if eval "$1"; then echo yes; else echo no; fi; }
+          echo "length: ${#v}"
+          echo "starts with postgresql:// or postgres://: $(yn '[[ "$v" == postgresql://* || "$v" == postgres://* ]]')"
+          echo "starts with a quote: $(yn '[[ "$v" == \"* || "$v" == '"\\'"'* ]]')"
+          echo "starts with 'psql ': $(yn '[[ "$v" == psql\ * ]]')"
+          echo "contains whitespace or newline: $(yn '[[ "$v" =~ [[:space:]] ]]')"
+          echo "contains '@' and 'neon.tech': $(yn '[[ "$v" == *@*neon.tech* ]]')"
 
       - name: Migrate database
         run: uv run alembic upgrade head

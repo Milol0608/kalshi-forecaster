@@ -78,7 +78,18 @@ class Settings(BaseSettings):
     @field_validator("database_url")
     @classmethod
     def _psycopg_driver(cls, v: str) -> str:
-        """Hosts like Neon hand out postgresql://... URLs; SQLAlchemy needs the psycopg driver named."""
+        """Hosts like Neon hand out postgresql://... URLs; SQLAlchemy needs the psycopg driver named.
+
+        Also forgives what tends to come along when a URL is pasted into a secret: surrounding
+        whitespace, matching quotes, a leading `psql ` (Neon's Connect panel offers that form),
+        or a `DATABASE_URL=` prefix.
+        """
+        v = v.strip()
+        for lead in ("psql ", "DATABASE_URL="):
+            if v.startswith(lead):
+                v = v[len(lead):].strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+            v = v[1:-1].strip()
         for prefix in ("postgresql://", "postgres://"):
             if v.startswith(prefix):
                 return "postgresql+psycopg://" + v[len(prefix):]

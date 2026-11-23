@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal as D
 
+import pytest
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -68,3 +69,18 @@ def test_neon_style_url_gets_psycopg_driver() -> None:
     url = "postgresql://user:secret@ep-x.neon.tech/db?sslmode=require"
     assert Settings(_env_file=None, database_url=url).database_url.startswith("postgresql+psycopg://")  # type: ignore[call-arg]
     assert Settings(_env_file=None, database_url="postgres://u:p@h/d").database_url == "postgresql+psycopg://u:p@h/d"  # type: ignore[call-arg]
+
+
+@pytest.mark.parametrize("pasted", [
+    "  postgresql://u:p@h.neon.tech/db?sslmode=require\n",
+    "'postgresql://u:p@h.neon.tech/db?sslmode=require'",
+    '"postgresql://u:p@h.neon.tech/db?sslmode=require"',
+    "psql 'postgresql://u:p@h.neon.tech/db?sslmode=require'",
+    "DATABASE_URL=postgresql://u:p@h.neon.tech/db?sslmode=require",
+])
+def test_pasted_url_variants_are_cleaned(pasted: str) -> None:
+    from sqlalchemy import make_url
+
+    url = Settings(_env_file=None, database_url=pasted).database_url  # type: ignore[call-arg]
+    assert url == "postgresql+psycopg://u:p@h.neon.tech/db?sslmode=require"
+    assert make_url(url).host == "h.neon.tech"
