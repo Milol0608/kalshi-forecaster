@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     max_per_event_pct: float = 0.10
     kill_switch_drawdown_pct: float = 0.30
 
+    # Scanner. Series are discovered from Kalshi metadata, not hardcoded.
+    # SERIES_TICKERS (comma-separated) overrides discovery when set.
+    series_tickers: str = ""
+    series_category: str = "Climate and Weather"
+    series_tag: str = "Daily temperature"
+    series_title_include: str = r"\b(high|highest|max|maximum)\b"
+    series_title_exclude: str = r"\b(low|lowest|min|minimum)\b"
+    min_volume_24h: float = 50.0
+    min_minutes_to_close: float = 60.0
+    kalshi_max_requests_per_second: float = 5.0
+
     @property
     def market_data_base_url(self) -> str:
         """Shadow and live read production prices; demo reads the demo environment."""

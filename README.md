@@ -34,6 +34,23 @@ Checked against Kalshi's OpenAPI spec (v3.37.0, snapshot in `docs/vendor/kalshi_
   MGF1-SHA-256, salt length = digest length). Signed message: `timestamp_ms + METHOD + path` without the query string.
   Headers: `KALSHI-ACCESS-KEY`, `KALSHI-ACCESS-TIMESTAMP`, `KALSHI-ACCESS-SIGNATURE`. Auth is built in milestone 7.
 
+- **Settlement source (found 2026-11-23, milestone 2).** The spec assumed NWS station observations. Every
+  active daily-high series lists **The Weather Company** (weather.com/kalshi) as its settlement source. The rules
+  name a station code, e.g. "maximum temperature recorded at New York City (CLINYC) … according to The Weather
+  Company". CLINYC is the NWS daily climate report for Central Park, so the *station* still looks like an NWS one,
+  but the *published value* that settles the market comes from The Weather Company. The rules warn that its
+  preliminary readings can differ by rounding. Milestone 4 must check observed highs against the settled values,
+  not just against NWS data.
+
+## Scanner
+
+`uv run python -m app.ingest.scanner` runs one scan. Series are discovered by category "Climate and Weather",
+tag "Daily temperature", frequency `daily`, with a title that says high/max and not low/min.
+Set `SERIES_TICKERS` to override. On 2026-11-23 that found 24 cities with open markets: 12 markets each, covering
+today's and tomorrow's events (6 temperature ranges per day).
+Every open market gets a `market_snapshots` row. Only candidates (active, 24h volume ≥ `MIN_VOLUME_24H`,
+≥ `MIN_MINUTES_TO_CLOSE` to close, something to buy) get an `orderbook_snapshots` row.
+
 ## Notes
 
 - `DATABASE_URL` uses `127.0.0.1`, not `localhost`. On this Windows machine `localhost` tries IPv6 first,

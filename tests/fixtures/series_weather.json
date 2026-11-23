@@ -1,0 +1,173 @@
+{
+ "series": [
+  {
+   "additional_prohibitions": [
+    "Persons who are employed by any of the Source Agencies are not permitted to trade on the Contract.",
+    "Persons who hold any material, non-public information on the Underlying are not permitted to trade on the Contract."
+   ],
+   "categories": [
+    "Climate and Weather"
+   ],
+   "category": "Climate and Weather",
+   "contract_terms_url": "https://assets.kalshi.com/contract_terms/PHILHIGH.pdf",
+   "contract_url": "https://assets.kalshi.com/regulatory/product-certifications/PHILHIGH.pdf",
+   "exchange_index": 0,
+   "fee_multiplier": 1,
+   "fee_type": "quadratic",
+   "frequency": "custom",
+   "last_updated_ts": "2026-10-15T08:14:10.229686Z",
+   "settlement_sources": [
+    {
+     "name": "NWS Climatological Report",
+     "url": "https://forecast.weather.gov/product.php?site=PHI&product=CLI&issuedby=PHL"
+    }
+   ],
+   "tags": [
+    "Daily temperature"
+   ],
+   "ticker": "KXPHILHIGH",
+   "title": "Highest temperature in Philadelphia"
+  },
+  {
+   "additional_prohibitions": [
+    "Persons who are employed by any of the Source Agencies are not permitted to trade on the Contract.",
+    "Persons who hold any material, non-public information on the Underlying are not permitted to trade on the Contract."
+   ],
+   "categories": [
+    "Climate and Weather"
+   ],
+   "category": "Climate and Weather",
+   "contract_terms_url": "https://assets.kalshi.com/contract_terms/GLOBALTEMPERATURE.pdf",
+   "contract_url": "https://assets.kalshi.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+   "exchange_index": 0,
+   "fee_multiplier": 1,
+   "fee_type": "quadratic",
+   "frequency": "daily",
+   "last_updated_ts": "2026-11-23T16:08:47.657007Z",
+   "settlement_sources": [
+    {
+     "name": "The Weather Company",
+     "url": "https://weather.com/kalshi"
+    }
+   ],
+   "tags": [
+    "Daily temperature"
+   ],
+   "ticker": "KXHIGHTDAL",
+   "title": "Dallas Maximum Temperature"
+  },
+  {
+   "additional_prohibitions": [
+    "Persons who are employed by any of the Source Agencies are not permitted to trade on the Contract.",
+    "Persons who hold any material, non-public information on the Underlying are not permitted to trade on the Contract."
+   ],
+   "categories": [
+    "Climate and Weather"
+   ],
+   "category": "Climate and Weather",
+   "contract_terms_url": "https://assets.kalshi.com/contract_terms/GLOBALTEMPERATURE.pdf",
+   "contract_url": "https://assets.kalshi.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+   "exchange_index": 0,
+   "fee_multiplier": 1,
+   "fee_type": "quadratic",
+   "frequency": "daily",
+   "last_updated_ts": "2026-11-23T16:08:47.633461Z",
+   "settlement_sources": [
+    {
+     "name": "The Weather Company",
+     "url": "https://weather.com/kalshi"
+    }
+   ],
+   "tags": [
+    "Daily temperature"
+   ],
+   "ticker": "KXLOWTNYC",
+   "title": "Lowest temperature in NYC"
+  },
+  {
+   "additional_prohibitions": [
+    "Persons who are employed by any of the Source Agencies are not permitted to trade on the Contract.",
+    "Persons who hold any material, non-public information on the Underlying are not permitted to trade on the Contract."
+   ],
+   "categories": [
+    "Climate and Weather"
+   ],
+   "category": "Climate and Weather",
+   "contract_terms_url": "https://assets.kalshi.com/contract_terms/GLOBALTEMPERATURE.pdf",
+   "contract_url": "https://assets.kalshi.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+   "exchange_index": 0,
+   "fee_multiplier": 1,
+   "fee_type": "quadratic",
+   "frequency": "daily",
+   "last_updated_ts": "2026-11-23T16:08:47.807918Z",
+   "settlement_sources": [
+    {
+     "name": "The Weather Company",
+     "url": "https://weather.com/kalshi"
+    }
+   ],
+   "tags": [
+    "Daily temperature"
+   ],
+   "ticker": "KXHIGHNY",
+   "title": "Highest temperature in NYC"
+  },
+  {
+   "additional_prohibitions": [
+    "Persons who are employed by any of the Source Agencies are not permitted to trade on the Contract.",
+    "Persons who hold any material, non-public information on the Underlying are not permitted to trade on the Contract."
+   ],
+   "categories": [
+    "Climate and Weather"
+   ],
+   "category": "Climate and Weather",
+   "contract_terms_url": "https://assets.kalshi.com/contract_terms/GLOBALTEMPERATURE.pdf",
+   "contract_url": "https://assets.kalshi.com/regulatory/product-certifications/GLOBALTEMPERATURE.pdf",
+   "exchange_index": 0,
+   "fee_multiplier": 1,
+   "fee_type": "quadratic",
+   "frequency": "daily",
+   "last_updated_ts": "2026-11-23T16:08:47.664725Z",
+   "settlement_sources": [
+    {
+     "name": "The Weather Company",
+     "url": "https://weather.com/kalshi"
+    }
+   ],
+   "tags": [
+    "Daily temperature"
+   ],
+   "ticker": "KXHIGHCHI",
+   "title": "Highest temperature in Chicago"
+  },
+  {
+   "additional_prohibitions": [
+    "Persons who are employed by any of the Source Agencies are not permitted to trade on the Contract.",
+    "Persons who hold any material, non-public information on the Underlying are not permitted to trade on the Contract."
+   ],
+   "categories": [
+    "Climate and Weather"
+   ],
+   "category": "Climate and Weather",
+   "contract_terms_url": "https://assets.kalshi.com/contract_terms/COLDNYC.pdf",
+   "contract_url": "https://assets.kalshi.com/regulatory/product-certifications/COLDNYC.pdf",
+   "exchange_index": 0,
+   "fee_multiplier": 1,
+   "fee_type": "quadratic",
+   "frequency": "monthly",
+   "last_updated_ts": "2026-10-15T08:14:10.229686Z",
+   "settlement_sources": [
+    {
+     "name": "NWS Climatological Report",
+     "url": "https://forecast.weather.gov/product.php?site=OKX&product=CLI&issuedby=NYC"
+    }
+   ],
+   "tags": [
+    "Climate change",
+    "Daily temperature"
+   ],
+   "ticker": "KXMINNYC",
+   "title": "Min NYC temp"
+  }
+ ]
+}
