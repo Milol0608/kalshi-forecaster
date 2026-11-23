@@ -55,3 +55,15 @@ Every open market gets a `market_snapshots` row. Only candidates (active, 24h vo
 
 - `DATABASE_URL` uses `127.0.0.1`, not `localhost`. On this Windows machine `localhost` tries IPv6 first,
   and Docker only publishes the port on IPv4, so each connection stalled before falling back.
+
+## Rules parser
+
+`uv run python -m app.ingest.rules_parser` parses every active market's rules (regex only, ADR 0003).
+Each parse is checked against Kalshi's own `strike_type`/`floor_strike`/`cap_strike`, the title, the YES
+subtitle and the event-ticker date. Any mismatch, or wording the regex doesn't fully match, gives
+`needs_review`, and that market is never traded. Each event's buckets must also cover every whole-degree reading
+exactly once (`event_check_ok`). Results are cached by (ticker, hash of every input field, parser version).
+
+Boundaries (readings are whole °F): "between 49-50" is 49–50 inclusive; "less than 49" is 48 or below;
+"greater than 56" is 57 or above. Station codes are NWS climate-report IDs. Watch out: Chicago is Midway (CLIMDW),
+Dallas is DFW (CLIDFW), DC is Reagan National (CLIDCA).

@@ -7,13 +7,14 @@ API data instead of guessed up front.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -22,6 +23,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB
@@ -124,3 +126,39 @@ class OrderbookSnapshot(Base):
     best_no_bid: Mapped[Decimal | None] = mapped_column(Price)
 
     __table_args__ = (Index("ix_orderbook_snapshots_ticker_fetched_at", "ticker", "fetched_at"),)
+
+
+class ParsedRule(Base):
+    """Structured reading of one market's rules. Cached by (ticker, inputs_hash, parser_version).
+
+    status is 'ok' or 'needs_review'. event_check_ok is recomputed every parse run because it
+    depends on the sibling markets of the same event. A market is tradable only if both pass.
+    """
+
+    __tablename__ = "parsed_rules"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticker: Mapped[str] = mapped_column(ForeignKey("markets.ticker"), index=True)
+    inputs_hash: Mapped[str] = mapped_column(String(64))
+    parser_version: Mapped[str] = mapped_column(String(32))
+    parsed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    confidence: Mapped[float] = mapped_column(Float)
+    location: Mapped[str | None] = mapped_column(Text)
+    station_id: Mapped[str | None] = mapped_column(String(16))
+    variable: Mapped[str | None] = mapped_column(String(32))
+    unit: Mapped[str | None] = mapped_column(String(4))
+    bucket_low: Mapped[float | None] = mapped_column(Float)
+    bucket_high: Mapped[float | None] = mapped_column(Float)
+    inclusive_low: Mapped[bool | None] = mapped_column(Boolean)
+    inclusive_high: Mapped[bool | None] = mapped_column(Boolean)
+    resolution_source: Mapped[str | None] = mapped_column(Text)
+    resolution_date: Mapped[date | None] = mapped_column(Date)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    event_check_ok: Mapped[bool | None] = mapped_column(Boolean)
+    event_check_note: Mapped[str | None] = mapped_column(Text)
+    review_resolution: Mapped[str | None] = mapped_column(Text)  # filled by a human after review
+
+    __table_args__ = (
+        UniqueConstraint("ticker", "inputs_hash", "parser_version", name="uq_parsed_rules_cache_key"),
+    )
