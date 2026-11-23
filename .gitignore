@@ -1,0 +1,10 @@
+.env
+*.pem
+*.key
+gate1_passed.json
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+pgdata/
