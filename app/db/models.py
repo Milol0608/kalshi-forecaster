@@ -238,3 +238,67 @@ class Forecast(Base):
     details: Mapped[Any] = mapped_column(Json)  # bias per model, inflation, member counts, data timestamps
 
     __table_args__ = (Index("ix_forecasts_ticker_decided_at", "ticker", "decided_at"),)
+
+
+class ShadowOrder(Base):
+    """One simulated buy, filled by walking a stored order book. Unfilled attempts are kept too."""
+
+    __tablename__ = "shadow_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    forecast_id: Mapped[int] = mapped_column(ForeignKey("forecasts.id"))
+    orderbook_snapshot_id: Mapped[int] = mapped_column(ForeignKey("orderbook_snapshots.id"))
+    ticker: Mapped[str] = mapped_column(ForeignKey("markets.ticker"), index=True)
+    event_ticker: Mapped[str] = mapped_column(String(128), index=True)
+    side: Mapped[str] = mapped_column(String(3))  # yes | no
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    probability: Mapped[float] = mapped_column(Float)  # model probability that this side wins
+    limit_price: Mapped[Decimal] = mapped_column(Price)
+    intended_contracts: Mapped[Decimal] = mapped_column(Count)
+    filled_contracts: Mapped[Decimal] = mapped_column(Count)
+    avg_price: Mapped[Decimal | None] = mapped_column(Price)
+    fee: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6))  # contracts x price + fee
+    edge_per_contract: Mapped[float | None] = mapped_column(Float)  # net of fees, at the realised fill
+    status: Mapped[str] = mapped_column(String(16))  # filled | partial | unfilled
+    fills: Mapped[Any] = mapped_column(Json)  # [[price, contracts], ...]
+
+
+class Position(Base):
+    """Net holding in one side of one market. Cost includes fees."""
+
+    __tablename__ = "positions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticker: Mapped[str] = mapped_column(ForeignKey("markets.ticker"))
+    event_ticker: Mapped[str] = mapped_column(String(128), index=True)
+    side: Mapped[str] = mapped_column(String(3))
+    contracts: Mapped[Decimal] = mapped_column(Count)
+    cost: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    fees: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    status: Mapped[str] = mapped_column(String(16), index=True)  # open | settled
+    opened_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    payout: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    pnl: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+
+    __table_args__ = (UniqueConstraint("ticker", "side", name="uq_positions_ticker_side"),)
+
+
+class BankrollSnapshot(Base):
+    """Shadow account state after each run. equity = cash + open positions at cost."""
+
+    __tablename__ = "bankroll_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    cash: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    open_cost: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    equity: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    peak_equity: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+    drawdown_pct: Mapped[float] = mapped_column(Float)
+    kill_switch: Mapped[bool] = mapped_column(Boolean)
+    note: Mapped[str | None] = mapped_column(Text)

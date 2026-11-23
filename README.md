@@ -88,3 +88,22 @@ Dallas is DFW (CLIDFW), DC is Reagan National (CLIDCA).
 - **Open-Meteo terms:** the free API is for non-commercial use, < 10,000 calls/day (we use ~1,600). Personal shadow
   research reads as non-commercial. Trading real money for profit may not. Decide before going live: a paid plan, or
   NOAA's public-domain GEFS files.
+
+## Strategy and shadow execution (milestone 5)
+
+`uv run python -m app.execution.shadow` simulates buys for the freshest forecasts (≤ 60 min old) against the freshest
+order book (≤ 45 min old). It refuses to run unless `MODE=shadow`, and it never calls an order API.
+
+- **Fees:** `round up(0.07 × C × P × (1−P))`, from Kalshi's fee schedule (`docs/kalshi-fee-schedule.pdf`, effective
+  2026-07-07). It matches every row of the schedule's fee table. No settlement fee. Open question: the text says centicent
+  rounding but the table uses cents, so we use cents (conservative) until demo fills show which is right.
+- **Edge:** P(side wins) − ask − fee per contract. YES asks come from NO bids (1 − bid). Must beat `MIN_EDGE` (3¢)
+  at the *realised* fill, after the per-order rounded fee. Tiny orders often fail this: 1 contract at 1¢ pays a 1¢ fee.
+- **Sizing:** quarter-Kelly on equity, then the tightest of 5% per market, 10% per event, 25% total, and cash.
+- **Ranking:** each run ranks opportunities by edge and fills the risk budget best-first.
+- **Fills:** walk the stored asks cheapest-first, never above the limit, never more than the listed depth. Partial or
+  zero fills are recorded too.
+- **Kill switch:** equity 30% below its peak means no new positions. Equity counts open positions at cost, so it only
+  moves when positions settle.
+- **Caveat:** a shadow fill doesn't remove liquidity from later snapshots. The per-market cap limits how much
+  that can double-count.

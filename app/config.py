@@ -70,6 +70,11 @@ class Settings(BaseSettings):
     laplace_alpha: float = 1.0
     weather_fetch_min_interval_minutes: int = 180
 
+    # Strategy. Decisions only use a forecast/order book this fresh at decision time.
+    kelly_fraction: float = 0.25
+    forecast_max_age_minutes: int = 60
+    book_max_age_minutes: int = 45
+
     @property
     def market_data_base_url(self) -> str:
         """Shadow and live read production prices; demo reads the demo environment."""
