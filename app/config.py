@@ -12,7 +12,7 @@ from enum import StrEnum
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 LIVE_CONFIRMATION_PHRASE = "yes-i-understand-real-money"
@@ -74,6 +74,15 @@ class Settings(BaseSettings):
     kelly_fraction: float = 0.25
     forecast_max_age_minutes: int = 60
     book_max_age_minutes: int = 45
+
+    @field_validator("database_url")
+    @classmethod
+    def _psycopg_driver(cls, v: str) -> str:
+        """Hosts like Neon hand out postgresql://... URLs; SQLAlchemy needs the psycopg driver named."""
+        for prefix in ("postgresql://", "postgres://"):
+            if v.startswith(prefix):
+                return "postgresql+psycopg://" + v[len(prefix):]
+        return v
 
     @property
     def market_data_base_url(self) -> str:

@@ -130,7 +130,7 @@ def snapshot(
         minutes_to_close=minutes_to_close,
         is_candidate=not reasons,
         skip_reason="; ".join(reasons) or None,
-        raw=raw,
+        raw=None,  # the full market JSON was 80% of storage; every field we use is a column above
     )
 
 

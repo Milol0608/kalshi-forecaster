@@ -1,0 +1,46 @@
+# Hourly shadow run on GitHub's free runners, against a free Neon Postgres.
+# Private repo budget: ~2,000 free minutes/month; one run/hour of ~1-2 min fits.
+# Shadow mode only: no Kalshi keys are needed or provided here.
+name: shadow
+
+on:
+  schedule:
+    - cron: "7 * * * *"   # :07 past each hour; GitHub warns the top of the hour is when runs get delayed
+  workflow_dispatch: {}   # "Run workflow" button for a manual run
+
+concurrency:
+  group: shadow
+  cancel-in-progress: false   # never run two pipelines against the same database at once
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      MODE: shadow
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync --frozen --no-dev
+
+      - name: Check database secret
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "::error::Add the DATABASE_URL repository secret (see docs/HOSTING.md)"; exit 1; fi
+
+      - name: Migrate database
+        run: uv run alembic upgrade head
+
+      - name: Run all jobs once (settle, scan, weather, forecast, shadow, retention)
+        run: uv run python -m app.jobs.schedule --once
+
+      - name: Report
+        run: uv run python -m app.report

@@ -103,7 +103,7 @@ class MarketSnapshot(Base):
     minutes_to_close: Mapped[float] = mapped_column(Float)
     is_candidate: Mapped[bool] = mapped_column(Boolean)
     skip_reason: Mapped[str | None] = mapped_column(Text)
-    raw: Mapped[Any] = mapped_column(Json)
+    raw: Mapped[Any | None] = mapped_column(Json, nullable=True)  # no longer stored (storage); kept for old rows
 
     __table_args__ = (Index("ix_market_snapshots_ticker_fetched_at", "ticker", "fetched_at"),)
 

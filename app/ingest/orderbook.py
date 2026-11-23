@@ -17,6 +17,7 @@ from app.db.models import OrderbookSnapshot
 from app.kalshi.client import KalshiClient
 
 ONE = Decimal("1")
+MAX_LEVELS = 15
 
 
 def best_bid(levels: list[list[str]]) -> Decimal | None:
@@ -33,8 +34,10 @@ def implied_ask(opposite_best_bid: Decimal | None) -> Decimal | None:
 def to_snapshot(
     ticker: str, book: dict[str, Any], fetched_at: datetime, run_id: int | None
 ) -> OrderbookSnapshot:
-    yes_bids = book.get("yes_dollars") or []
-    no_bids = book.get("no_dollars") or []
+    # Keep the best MAX_LEVELS per side (Kalshi sorts ascending, best last). A shadow order
+    # never walks more than a few cents past the top, and full depth was ~40% of storage.
+    yes_bids = sorted(book.get("yes_dollars") or [], key=lambda lv: Decimal(lv[0]))[-MAX_LEVELS:]
+    no_bids = sorted(book.get("no_dollars") or [], key=lambda lv: Decimal(lv[0]))[-MAX_LEVELS:]
     return OrderbookSnapshot(
         run_id=run_id,
         ticker=ticker,

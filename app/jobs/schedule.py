@@ -130,8 +130,14 @@ def settle_job(settings: Settings) -> None:
             r = resolve(session, client, settings, run_id)
         return f"checked {r.checked}, settled {r.newly_settled}, positions {r.positions_settled}, P&L ${r.pnl:+.2f}"
 
+    def retention(session: Session, run_id: int) -> str:
+        from app.jobs.retention import prune
+
+        return ", ".join(f"{k} {v}" for k, v in prune(session).items())
+
     step("observe", observations, settings)
     step("settle", settle, settings)
+    step("retention", retention, settings)
 
 
 def report_job(settings: Settings) -> None:
