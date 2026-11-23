@@ -5,14 +5,50 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
+import os
+
 import httpx
 import pytest
+from sqlalchemy import create_engine, make_url, text
 from sqlalchemy.orm import Session
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.kalshi.client import KalshiClient
 
 FIXTURES = Path(__file__).parent / "fixtures"
+TEST_DB = "kalshi_test"
+
+
+def _use_test_database() -> bool:
+    """Point the whole app at a separate `kalshi_test` database, created and migrated here.
+
+    Tests used to share the dev database and twice collided with real rows (observations,
+    positions). Real data can't leak into tests, and tests can't touch real data.
+    """
+    url = make_url(get_settings().database_url)
+    test_url = url.set(database=TEST_DB)
+    admin = create_engine(url.set(database="postgres"), isolation_level="AUTOCOMMIT", connect_args={"connect_timeout": 3})
+    try:
+        with admin.connect() as conn:
+            if not conn.scalar(text("SELECT 1 FROM pg_database WHERE datname = :n"), {"n": TEST_DB}):
+                conn.execute(text(f'CREATE DATABASE "{TEST_DB}"'))
+    except Exception:
+        return False
+    finally:
+        admin.dispose()
+    os.environ["DATABASE_URL"] = test_url.render_as_string(hide_password=False)
+    from app.db.session import get_engine
+
+    get_settings.cache_clear()
+    get_engine.cache_clear()
+    from alembic import command
+    from alembic.config import Config
+
+    command.upgrade(Config("alembic.ini"), "head")
+    return True
+
+
+TEST_DB_READY = _use_test_database()
 
 
 def load(name: str) -> dict[str, Any]:
@@ -59,7 +95,7 @@ def db_session() -> Iterator[Session]:
     """A real Postgres session whose writes are all rolled back at the end."""
     from app.db.session import get_engine, ping_db
 
-    if not ping_db():
+    if not TEST_DB_READY or not ping_db():
         pytest.skip("Postgres not running (docker compose up -d db)")
     conn = get_engine().connect()
     outer = conn.begin()

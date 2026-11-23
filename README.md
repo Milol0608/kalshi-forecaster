@@ -107,3 +107,27 @@ order book (≤ 45 min old). It refuses to run unless `MODE=shadow`, and it neve
   moves when positions settle.
 - **Caveat:** a shadow fill doesn't remove liquidity from later snapshots. The per-market cap limits how much
   that can double-count.
+
+## Running it unattended (milestone 6)
+
+```powershell
+docker compose up -d db
+uv run python -m app.jobs.schedule
+```
+
+- **Every 30 min:** scan → parse → weather → forecast → shadow trades.
+- **Hourly at :15:** observed highs → settle closed markets and shadow positions.
+- **Daily at 15:00 UTC:** report written to `logs/report-YYYY-MM-DD.txt`.
+
+Each step is its own `runs` row. A failing step is logged and recorded, and the scheduler carries on. Logs go to
+`logs/scheduler.log`. `--once` runs every job one time and exits. **The PC must stay awake:** runs missed while it
+sleeps are simply skipped (freshness limits stop the bot from trading on stale data afterwards).
+
+- `uv run python -m app.report`: summary in the terminal. Brier and log loss for the model vs the market's mid at
+  the same moment; bootstrap CI over whole events; calibration table; P&L gross / net of fees / net of API costs;
+  bankroll and drawdown. If the model is worse than the market, it says so in capitals.
+- `uv run python -m app.settle.resolver`: settle now. Markets settle when Kalshi reports `settlement_ts` and a
+  yes/no result (`finalized`). NYC settled about 6 hours after close.
+- **API:** `/health`, `/forecasts?date=YYYY-MM-DD`, `/trades`, `/metrics`.
+- **Scoring unit:** each market's last forecast per model version, all made before the climate day starts.
+- **Tests** use a separate `kalshi_test` database, created and migrated automatically, so they never touch real data.

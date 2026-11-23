@@ -52,6 +52,12 @@ class FetchReport:
     fetched: list[str] = field(default_factory=list)
     skipped_fresh: list[str] = field(default_factory=list)
     errors: list[str] = field(default_factory=list)
+    calls: int = 0
+    quota_units: float = 0.0  # Open-Meteo reports each call's quota cost in x-ratelimit-cost
+
+    def count(self, resp: httpx.Response) -> None:
+        self.calls += 1
+        self.quota_units += float(resp.headers.get("x-ratelimit-cost", 1))
 
 
 def _store_raw(
@@ -123,6 +129,7 @@ def fetch_ensembles(
         }
         try:
             resp = http.get(ENSEMBLE_URL, params=params)
+            report.count(resp)
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
@@ -161,6 +168,7 @@ def fetch_previous_runs(
         }
         try:
             resp = http.get(PREVIOUS_RUNS_URL, params=params)
+            report.count(resp)
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
@@ -186,6 +194,7 @@ def fetch_nws_forecasts(
     for st in stations:
         try:
             resp = http.get(st.nws_forecast_url, headers={"Accept": "application/geo+json"})
+            report.count(resp)
             resp.raise_for_status()
             data = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
@@ -216,6 +225,7 @@ def fetch_observations(
         try:
             for y in years:
                 resp = http.get(IEM_CLI_URL, params={"station": st.icao, "year": y})
+                report.count(resp)
                 resp.raise_for_status()
                 rows += resp.json()["results"]
         except (httpx.HTTPError, ValueError) as exc:

@@ -98,6 +98,13 @@ class KalshiClient:
             if not cursor:
                 return
 
+    def get_markets_by_ticker(self, tickers: list[str], chunk: int = 50) -> list[dict[str, Any]]:
+        """GET /markets?tickers=a,b,c. With `tickers` as the only filter the API returns all matches unpaged."""
+        out: list[dict[str, Any]] = []
+        for i in range(0, len(tickers), chunk):
+            out += self.get("/markets", {"tickers": ",".join(tickers[i : i + chunk])}).get("markets", [])
+        return out
+
     def get_orderbooks(self, tickers: list[str]) -> dict[str, dict[str, Any]]:
         """Return {ticker: orderbook_fp}. Chunks requests at the 100-ticker API limit."""
         books: dict[str, dict[str, Any]] = {}

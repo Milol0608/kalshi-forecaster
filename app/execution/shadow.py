@@ -22,7 +22,6 @@ from sqlalchemy.orm import Session
 
 from app.config import Mode, Settings
 from app.db.models import (
-    BankrollSnapshot,
     Forecast,
     MarketSnapshot,
     OrderbookSnapshot,
@@ -32,7 +31,7 @@ from app.db.models import (
 from app.forecast.weather_model import MODEL_VERSION
 from app.kalshi.fees import model_fee, order_fee
 from app.strategy.edge import Level, asks_for, edge_at, limit_price
-from app.strategy.risk import Account, kill_switch_on, load_account, max_new_spend
+from app.strategy.risk import Account, kill_switch_on, load_account, max_new_spend, snapshot_bankroll
 from app.strategy.sizing import kelly_spend
 
 ONE = Decimal(1)
@@ -207,12 +206,8 @@ def run_shadow(session: Session, settings: Settings, as_of: datetime, run_id: in
             else:
                 result.orders.append(_apply(session, out, f, book, acct, as_of, run_id))
 
-    peak = max(acct.peak_equity, acct.equity)
-    session.add(BankrollSnapshot(
-        run_id=run_id, at=as_of, cash=acct.cash, open_cost=acct.open_cost, equity=acct.equity, peak_equity=peak,
-        drawdown_pct=0.0 if peak <= 0 else float(1 - acct.equity / peak), kill_switch=result.kill_switch,
-        note="KILL SWITCH: drawdown limit hit, no new positions" if result.kill_switch else None,
-    ))
+    snapshot_bankroll(session, acct, as_of, run_id, result.kill_switch,
+                      "KILL SWITCH: drawdown limit hit, no new positions" if result.kill_switch else None)
     session.flush()
     return result
 

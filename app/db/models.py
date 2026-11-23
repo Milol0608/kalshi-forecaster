@@ -302,3 +302,32 @@ class BankrollSnapshot(Base):
     drawdown_pct: Mapped[float] = mapped_column(Float)
     kill_switch: Mapped[bool] = mapped_column(Boolean)
     note: Mapped[str | None] = mapped_column(Text)
+
+
+class Settlement(Base):
+    """Final outcome of one market, as published by Kalshi."""
+
+    __tablename__ = "settlements"
+
+    ticker: Mapped[str] = mapped_column(ForeignKey("markets.ticker"), primary_key=True)
+    result: Mapped[str] = mapped_column(String(8))  # yes | no
+    settlement_value: Mapped[Decimal] = mapped_column(Price)  # YES payout per contract
+    expiration_value: Mapped[str | None] = mapped_column(String(32))  # the settled temperature, e.g. "61.00"
+    settled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    status: Mapped[str] = mapped_column(String(16))
+
+
+class ApiCost(Base):
+    """Usage and dollar cost of external APIs, per run. Free APIs are logged at $0 so quota use is visible."""
+
+    __tablename__ = "api_costs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int | None] = mapped_column(ForeignKey("runs.id"), index=True)
+    at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    provider: Mapped[str] = mapped_column(String(32))
+    endpoint: Mapped[str] = mapped_column(String(64))
+    calls: Mapped[int] = mapped_column(Integer)
+    quota_units: Mapped[float] = mapped_column(Float)  # provider's own accounting, e.g. Open-Meteo x-ratelimit-cost
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6))

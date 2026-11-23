@@ -8,6 +8,7 @@ when the kill switch can fire mid-day, and it's simple to audit.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -54,6 +55,18 @@ def load_account(session: Session, settings: Settings) -> Account:
     peak = session.scalar(select(func.max(BankrollSnapshot.peak_equity)))
     acct.peak_equity = max(start, Decimal(peak or 0), acct.equity)
     return acct
+
+
+def snapshot_bankroll(
+    session: Session, acct: Account, at: datetime, run_id: int | None, kill_switch: bool, note: str | None = None
+) -> BankrollSnapshot:
+    peak = max(acct.peak_equity, acct.equity)
+    snap = BankrollSnapshot(
+        run_id=run_id, at=at, cash=acct.cash, open_cost=acct.open_cost, equity=acct.equity, peak_equity=peak,
+        drawdown_pct=0.0 if peak <= 0 else float(1 - acct.equity / peak), kill_switch=kill_switch, note=note,
+    )
+    session.add(snap)
+    return snap
 
 
 def kill_switch_on(acct: Account, settings: Settings) -> bool:
