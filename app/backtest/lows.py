@@ -32,6 +32,8 @@ from app.kalshi.client import KalshiClient
 DIR = Path("data/backtest/lows")
 LATER_HALF = date(2026, 7, 1)
 LO, HI = 0.65, 0.95
+RATE = 8.0  # requests/s; run alone (Kalshi answers 429 when several downloads share this IP)
+ARCHIVED_RATE = 3.5  # /historical/markets/{t}/candlesticks answers 429 above ~3.5/s (found by K5, 2026-11-24)
 
 # City -> time zone, by the series ticker's suffix (US NWS climate days; foreign cities use local time).
 TZ = {
@@ -110,7 +112,7 @@ def download(client: KalshiClient, base: str) -> None:
             print(f"  live prices: {i}/{len(by_day)} decision times, {len(archived)} archived queued", flush=True)
     ppath.write_text(json.dumps(prices), encoding="utf-8")
 
-    # Phase B: archived markets need one request each; 6 workers share one pacing gate (<= 8/s).
+    # Phase B: archived markets need one request each; 6 workers share one pacing gate (<= RATE/s).
     import threading
     import time
     from concurrent.futures import ThreadPoolExecutor
@@ -119,10 +121,10 @@ def download(client: KalshiClient, base: str) -> None:
 
     def fetch(item: tuple[dict[str, Any], int], http: httpx.Client) -> tuple[str, dict[str, str] | None]:
         m, t = item
-        for attempt in range(6):
+        for attempt in range(9):
             with gate:
                 wait = next_slot[0] - time.monotonic()
-                next_slot[0] = max(next_slot[0], time.monotonic()) + 1 / 8
+                next_slot[0] = max(next_slot[0], time.monotonic()) + 1 / ARCHIVED_RATE
             if wait > 0:
                 time.sleep(wait)
             try:
@@ -132,7 +134,7 @@ def download(client: KalshiClient, base: str) -> None:
                 time.sleep(2 ** attempt)
                 continue
             if r.status_code in (429, 500, 502, 503, 504):
-                time.sleep(float(r.headers.get("Retry-After") or 2 ** attempt))
+                time.sleep(float(r.headers.get("Retry-After") or min(60, 2 ** attempt)))
                 continue
             if r.status_code != 200:
                 return m["ticker"], None
@@ -231,7 +233,7 @@ def score() -> None:
 def main() -> None:
     if "--score" not in sys.argv:
         s = get_settings()
-        with KalshiClient(s.kalshi_prod_base_url, max_requests_per_second=8) as client:
+        with KalshiClient(s.kalshi_prod_base_url, max_requests_per_second=RATE, max_retries=9) as client:
             download(client, s.kalshi_prod_base_url)
     score()
 
