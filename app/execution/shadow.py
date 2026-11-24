@@ -28,7 +28,6 @@ from app.db.models import (
     Position,
     ShadowOrder,
 )
-from app.forecast.weather_model import MODEL_VERSION
 from app.kalshi.fees import model_fee, order_fee
 from app.strategy.edge import Level, asks_for, edge_at, limit_price
 from app.strategy.risk import Account, kill_switch_on, load_account, max_new_spend, snapshot_bankroll
@@ -103,16 +102,17 @@ def plan_side(
     return "no size clears min edge after rounded fees"
 
 
-def _latest_forecasts(session: Session, as_of: datetime, max_age: timedelta) -> list[Forecast]:
+def _latest_forecasts(session: Session, as_of: datetime, max_age: timedelta, version: str) -> list[Forecast]:
     latest = (
         select(Forecast.ticker, func.max(Forecast.decided_at).label("decided_at"))
-        .where(Forecast.model_version == MODEL_VERSION, Forecast.decided_at <= as_of,
+        .where(Forecast.model_version == version, Forecast.decided_at <= as_of,
                Forecast.decided_at >= as_of - max_age)
         .group_by(Forecast.ticker)
         .subquery()
     )
     return list(session.scalars(
         select(Forecast).join(latest, (Forecast.ticker == latest.c.ticker) & (Forecast.decided_at == latest.c.decided_at))
+        .where(Forecast.model_version == version)  # two models can log at the same decided_at
         .order_by(Forecast.ticker)
     ))
 
@@ -184,7 +184,8 @@ def run_shadow(session: Session, settings: Settings, as_of: datetime, run_id: in
         # Pass 1: find every opportunity. Pass 2: fill the risk budget best-edge first, so the
         # limited exposure goes to the strongest edges, not to whichever ticker sorts first.
         candidates: list[tuple[float, Forecast, OrderbookSnapshot]] = []
-        for f in _latest_forecasts(session, as_of, timedelta(minutes=settings.forecast_max_age_minutes)):
+        for f in _latest_forecasts(session, as_of, timedelta(minutes=settings.forecast_max_age_minutes),
+                                   settings.trade_model_version):
             snap = session.get(MarketSnapshot, f.market_snapshot_id) if f.market_snapshot_id else None
             if snap is None or not snap.is_candidate:
                 result.skipped["market failed liquidity filter"] += 1

@@ -82,6 +82,8 @@ def main() -> None:
     ap.add_argument("--prices", default=str(CACHE / "prices.json"), help="prices file (e.g. a snapshot)")
     ap.add_argument("--decision", choices=["eve", "am"], default="eve",
                     help="eve: 8pm the evening before (when the live bot trades); am: 8am on the day")
+    ap.add_argument("--export", help="fit NBM calibration and blend on everything before --test-start, "
+                                      "write them to this file for the live model, and stop")
     args = ap.parse_args()
     test_start = date.fromisoformat(args.test_start)
     settings = get_settings()
@@ -219,6 +221,20 @@ def main() -> None:
 
     blend, pb = blended(pe_a, "blend")
     nbm_blend, pnb = blended(pn_a, "nbm_blend")
+    if args.export:
+        from datetime import datetime, timezone
+
+        out_path = Path(args.export)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps({
+            "meta": {"model": nbm.__name__, "decision": args.decision, "trained_before": test_start.isoformat(),
+                     "fitted_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                     "train_markets": int(train.sum()), "train_events": len({r.event for r, t in zip(rows, train) if t})},
+            "nbm_emos": {c: e.params.tolist() for c, e in sorted(nbm_emos.items())},
+            "nbm_blend": nbm_blend.params.tolist(),
+        }, indent=1), encoding="utf-8")
+        print(f"exported live parameters to {out_path}")
+        return
     models = {"current": pc_a, "emos": pe_a, "blend": pb, "nbm_raw": pnr_a, "nbm": pn_a, "nbm_blend": pnb}
 
     ev_test = [r.event for r, t in zip(rows, test) if t]
@@ -239,6 +255,7 @@ def main() -> None:
     sim = {}
     for name, p in models.items():
         equity = Decimal(str(settings.starting_bankroll))
+        curve: list[tuple[str, float, int]] = []
         peak, max_dd, trades, wins = equity, 0.0, 0, 0
         by_day: dict[date, list[int]] = defaultdict(list)
         for i, r in enumerate(rows):
@@ -248,6 +265,7 @@ def main() -> None:
             spent: dict[str, Decimal] = defaultdict(Decimal)
             total = Decimal(0)
             pnl_day = Decimal(0)
+            n_day = 0
             cands = []
             for i in by_day[d]:
                 r = rows[i]
@@ -278,12 +296,14 @@ def main() -> None:
                 spent[r.event] += cost
                 total += cost
                 trades += 1
+                n_day += 1
                 wins += won
             equity += pnl_day
+            curve.append((d.isoformat(), float(equity), n_day))
             peak = max(peak, equity)
             max_dd = max(max_dd, float(1 - equity / peak))
         rate = f"{wins / trades:.0%}" if trades else "-"
-        sim[name] = {"trades": trades, "wins": wins, "final": float(equity), "max_dd": max_dd}
+        sim[name] = {"trades": trades, "wins": wins, "final": float(equity), "max_dd": max_dd, "curve": curve}
         print(f"  {name:<9} trades {trades:>5}  win rate {rate:>4}  final bankroll ${equity:>9.2f}  max drawdown {max_dd:.0%}")
 
     out = {"test_start": test_start.isoformat(), "emos": {c: e.params.tolist() for c, e in emos.items()},

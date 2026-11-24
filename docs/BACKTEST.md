@@ -54,15 +54,22 @@ so the market row differs a little from the table above.
 
 | test from | | market | nbm_raw | nbm | blend | nbm_blend | blend $100 → | nbm_blend $100 → |
 |---|---|---|---|---|---|---|---|---|
-| 2026-03-01 | eve | 0.1057 | −0.0164 | −0.0155 | +0.0011 | +0.0009 | $79.67 (dd 40%) | **$166.27** (dd 71%) |
-| 2026-03-01 | am | 0.0961 | −0.0221 | −0.0228 | +0.0006 | +0.0007 | $125.81 (dd 48%) | $105.27 (dd 47%) |
-| 2026-07-01 | eve | 0.1031 | −0.0185 | −0.0175 | +0.0020 | +0.0018 | $74.09 (dd 38%) | **$166.94** (dd 36%) |
+| 2026-03-01 | eve | 0.1045 | −0.0177 | −0.0166 | +0.0011 | +0.0008 | $86.83 (dd 40%) | **$151.23** (dd 71%) |
+| 2026-03-01 | am | 0.0952 | −0.0233 | −0.0241 | +0.0006 | +0.0007 | $107.75 (dd 48%) | $136.53 (dd 47%) |
+| 2026-07-01 | eve | 0.1031 | −0.0185 | −0.0175 | +0.0020 | +0.0018 | $74.09 (dd 38%) | $166.94 (dd 36%) |
 | 2026-07-01 | am | 0.0949 | −0.0240 | −0.0246 | +0.0015 | +0.0015 | $136.86 (dd 12%) | $83.27 (dd 33%) |
+
+The 2026-03-01 rows include 3–21 Nov. The first run lost those days: NOAA dropped the version from the bulletin header
+on 2026-11-03 and the parser required it. The 2026-07-01 rows are from that first run.
+
+`nbm_blend` (eve) month by month from $100: Mar +25%, Apr +71%, May −19%, Jun +36%, Jul +41%, Aug +18%, Sep −50%,
+Oct −21%, Nov −4%. The simulation doesn't apply the kill switch. Under the bot's real rule (stop at 30% below the
+peak), it would have stopped on 2026-04-30 at $214, after swinging above $300 within April.
 
 Gaps are Brier vs market (+ = better); every CI excludes zero. NBM alone is better than our own models but still clearly
 worse than the market. Mixed with the market, NBM gets the largest model weight yet (eve 0.28 vs 0.08 for ours).
 
-**Verdict: a candidate, not proven.** `nbm_blend` at `eve` grew $100 to about $166 in both splits. However, the
+**Verdict: a candidate, not proven.** `nbm_blend` at `eve` grew $100 to $151–$167 depending on the split. However, the
 splits overlap (Jul–Nov is inside Mar–Nov), so Mar–Jun alone was about flat with a 71% drawdown. The simulation
 uses top-of-book prices only. The other blends swing between losing and winning from split to split, which is what
 a Brier edge of 0.001 looks like after fees. The honest next test is forward: run `nbm_blend` (eve) in shadow on

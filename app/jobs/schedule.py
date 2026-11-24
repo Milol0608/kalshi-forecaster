@@ -38,6 +38,8 @@ from app.evidence.weather import (
     fetch_previous_runs,
 )
 from app.execution.shadow import run_shadow
+from app.forecast.nbm_blend import MODEL_VERSION as NBM_VERSION
+from app.forecast.nbm_blend import fetch_nbm, run_nbm_forecasts
 from app.forecast.weather_model import run_forecasts
 from app.ingest.rules_parser import parse_markets
 from app.ingest.scanner import run_scan
@@ -93,17 +95,30 @@ def pipeline(settings: Settings) -> None:
             prev = fetch_previous_runs(session, http, st, settings.bias_window_days + 2, run_id)
             ens = fetch_ensembles(session, http, st, timedelta(minutes=settings.weather_fetch_min_interval_minutes), run_id)
             nws = fetch_nws_forecasts(session, http, st, run_id)
+        with httpx.Client(timeout=120) as http:
+            nb = fetch_nbm(session, http, st, now(), run_id)
+        if nb.calls:
+            session.add(ApiCost(run_id=run_id, at=now(), provider="noaa-nbm", endpoint="nbs-bulletin",
+                                calls=nb.calls, quota_units=0, cost_usd=Decimal(0)))
         log_costs(session, run_id, "open-meteo", "previous-runs", prev)
         log_costs(session, run_id, "open-meteo", "ensemble", ens)
         log_costs(session, run_id, "nws", "gridpoint-forecast", nws)
-        errors = prev.errors + ens.errors + nws.errors
+        errors = prev.errors + ens.errors + nws.errors + nb.errors
         for e in errors:
             log.warning("weather: %s", e)
-        return f"ensembles fetched {len(ens.fetched)}, fresh {len(ens.skipped_fresh)} | nws {len(nws.fetched)} | errors {len(errors)}"
+        nbm_note = nb.skipped or f"{nb.stations} stations"
+        return (f"ensembles fetched {len(ens.fetched)}, fresh {len(ens.skipped_fresh)} | nws {len(nws.fetched)} | "
+                f"nbm {nb.cycle or '-'} {nbm_note} | errors {len(errors)}")
 
     def forecast(session: Session, run_id: int) -> str:
-        r = run_forecasts(session, stations, settings, now(), run_id)
-        return f"{len(r.forecasts)} forecasts, {len(r.skipped)} events skipped"
+        at = now()
+        r = run_forecasts(session, stations, settings, at, run_id)
+        n = run_nbm_forecasts(session, stations, settings, at, run_id)
+        reasons: dict[str, int] = {}
+        for k in n.skipped:
+            reasons[k.reason] = reasons.get(k.reason, 0) + 1
+        return (f"ens {len(r.forecasts)} forecasts, {len(r.skipped)} events skipped | "
+                f"{NBM_VERSION} {len(n.forecasts)} forecasts, skipped {reasons}")
 
     def shadow(session: Session, run_id: int) -> str:
         r = run_shadow(session, settings, now(), run_id)

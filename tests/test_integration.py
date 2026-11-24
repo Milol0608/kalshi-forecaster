@@ -56,7 +56,9 @@ def test_full_shadow_cycle(db_session: Session, fixture_client: KalshiClient, se
     ny = [f for f in fc.forecasts if f.event_ticker == "KXHIGHNY-26NOV24"]
     assert len(ny) == 6 and abs(sum(f.probability for f in ny) - 1) < 1e-9
 
-    trades = run_shadow(db_session, settings, decide_at)
+    from app.forecast.weather_model import MODEL_VERSION as ENS
+
+    trades = run_shadow(db_session, settings.model_copy(update={"trade_model_version": ENS}), decide_at)
     filled = [o for o in trades.orders if o.filled_contracts > 0]
     assert filled, f"expected at least one simulated trade; skipped: {dict(trades.skipped)}"
     assert all(o.ticker.startswith("KXHIGHNY-26NOV24") for o in filled)  # only NY Nov 24 has books

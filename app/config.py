@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     forecast_max_age_minutes: int = 60
     book_max_age_minutes: int = 45
 
+    # Which model's forecasts the shadow trader acts on. Every model keeps logging forecasts,
+    # so the report scores all of them against the market.
+    trade_model_version: str = "nbm-blend-v1"
+    nbm_params_file: Path = Path("data/models/nbm_blend_v1.json")
+    nbm_max_age_hours: int = 6
+
     @field_validator("database_url")
     @classmethod
     def _psycopg_driver(cls, v: str) -> str:

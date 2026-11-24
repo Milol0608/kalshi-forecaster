@@ -31,14 +31,13 @@ import httpx
 
 from app.backtest.data import CACHE, decision_times
 from app.config import get_settings
-from app.evidence.stations import Station, climate_day_utc, load_stations
+from app.evidence.stations import Station, load_stations
+from app.forecast.nbm_blend import HEADER, parse_block, station_features
 
 BUCKET = "https://noaa-nbm-grib2-pds.s3.amazonaws.com"
 NBM_CACHE = CACHE / "nbm"
 CYCLES = {"eve": 23, "am": 11}  # eve uses the 23Z run of the day before
-ROWS = ("TXN", "XND", "TMP", "TSD")
 PROBE = 4096  # every block is < 3.5 KB, so a probe this size always holds a block header
-HEADER = re.compile(rb"\n ?([A-Z0-9]{3,8}) +NBM V[\d.]+ NBS GUIDANCE +(\d+)/(\d+)/(\d{4}) +(\d{2})00 UTC")
 
 
 def key_for(cycle_day: date, hour: int) -> str:
@@ -112,34 +111,6 @@ def _cut(buf: bytes, start: int) -> bytes:
     return buf[start + 1: nxt.start() if nxt else len(buf)]
 
 
-def parse_block(block: bytes) -> dict | None:
-    """Rows by forecast hour: {"cycle": iso, "fhr": [...], "TXN": [...], ...} (None = blank)."""
-    lines = block.decode("ascii", "replace").splitlines()
-    m = HEADER.search(b"\n" + lines[0].encode())
-    if not m:
-        return None
-    mon, day, yr, hh = int(m.group(2)), int(m.group(3)), int(m.group(4)), int(m.group(5))
-    cycle = datetime(yr, mon, day, hh, tzinfo=timezone.utc)
-    rows = {ln[:4].strip(): ln for ln in lines[1:] if ln[:4].strip()}
-    if "FHR" not in rows:
-        return None
-    fhr_line = rows["FHR"]
-    ends = [mm.end() for mm in re.finditer(r"\d+", fhr_line[4:])]
-    ends = [e + 4 for e in ends]
-    out: dict = {"cycle": cycle.isoformat(), "fhr": [int(fhr_line[e - 3:e]) for e in ends]}
-    for name in ROWS:
-        ln = rows.get(name, "")
-        vals = []
-        for e in ends:
-            cell = ln[e - 3:e].strip() if len(ln) >= e - 3 else ""
-            try:
-                vals.append(int(cell))
-            except ValueError:
-                vals.append(None)
-        out[name] = vals
-    return out
-
-
 def download_file(client: httpx.Client, cycle_day: date, hour: int, icaos: list[str],
                   offsets: dict[str, int], lock: threading.Lock) -> dict | None:
     path = NBM_CACHE / f"{cycle_day:%Y%m%d}{hour:02d}.json"
@@ -171,12 +142,9 @@ def download_file(client: httpx.Client, cycle_day: date, hour: int, icaos: list[
 
 
 def features(stations: dict[str, Station], decision: str, days: list[date]) -> dict[str, dict[str, dict]]:
-    """{cli_code: {day_iso: {"txn", "xnd", "tmax", "tsd"}}} from the cycle that serves `decision`.
+    """{cli_code: {day_iso: station_features(...)}} from the cycle that serves `decision`.
 
-    txn/xnd: NBM's daytime max for the day (00Z column of the next day) and its SD.
-    tmax/tsd: highest 3-hourly TMP inside the climate day (midnight-midnight local standard
-    time, which can differ from NBM's daytime max on front days) and the TSD at that hour.
-    A bulletin published after the decision time is skipped (no look-ahead).
+    The same feature code as the live model (app.forecast.nbm_blend). A bulletin published after the decision time is skipped (no look-ahead).
     """
     out: dict[str, dict[str, dict]] = {c: {} for c in stations}
     files: dict[str, dict | None] = {}
@@ -194,18 +162,9 @@ def features(stations: dict[str, Station], decision: str, days: list[date]) -> d
             blk = data["stations"].get(st.icao)
             if not blk or published > decision_times(d, st)[decision]:
                 continue
-            cycle = datetime.fromisoformat(blk["cycle"])
-            valid = [cycle + timedelta(hours=h) for h in blk["fhr"]]
-            max_at = datetime(d.year, d.month, d.day, tzinfo=timezone.utc) + timedelta(days=1)
-            i = next((k for k, v in enumerate(valid) if v == max_at), None)
-            if i is None or blk["TXN"][i] is None or blk["XND"][i] is None:
-                continue
-            a, b = climate_day_utc(d, st.timezone)
-            tmps = [(blk["TMP"][k], blk["TSD"][k]) for k, v in enumerate(valid)
-                    if a <= v <= b and blk["TMP"][k] is not None]
-            tmax, tsd = max(tmps) if tmps else (blk["TXN"][i], blk["XND"][i])
-            out[c][d.isoformat()] = {"txn": blk["TXN"][i], "xnd": blk["XND"][i],
-                                     "tmax": tmax, "tsd": tsd if tsd is not None else blk["XND"][i]}
+            f = station_features(blk, d, st)
+            if f is not None:
+                out[c][d.isoformat()] = f
     return out
 
 

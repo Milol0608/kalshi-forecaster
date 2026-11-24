@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import Mode, Settings
 from app.db.models import Forecast, Market, MarketSnapshot, OrderbookSnapshot, Position, ShadowOrder
 from app.execution.shadow import Plan, plan_side, run_shadow, walk_book
-from app.forecast.weather_model import MODEL_VERSION
+from app.forecast.nbm_blend import MODEL_VERSION  # the model the shadow trader acts on by default
 from app.strategy.edge import asks_for, edge_at, limit_price
 from app.strategy.risk import Account, kill_switch_on, max_new_spend
 from app.strategy.sizing import kelly_fraction, kelly_spend
@@ -186,3 +186,9 @@ def seed_named(s: Session, ticker: str, probability: float) -> str:
     s.add(OrderbookSnapshot(ticker=ticker, fetched_at=AS_OF - timedelta(minutes=10), yes_bids=YES_BIDS, no_bids=NO_BIDS))
     s.flush()
     return ticker
+
+
+def test_only_the_configured_model_is_traded(clean_account: Session, settings: Settings) -> None:
+    seed(clean_account, 0.55, AS_OF - timedelta(minutes=10))
+    other = settings.model_copy(update={"trade_model_version": "some-other-model"})
+    assert run_shadow(clean_account, other, AS_OF).orders == []

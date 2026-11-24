@@ -89,6 +89,12 @@ Dallas is DFW (CLIDFW), DC is Reagan National (CLIDCA).
   research reads as non-commercial. Trading real money for profit may not. Decide before going live: a paid plan, or
   NOAA's public-domain GEFS files.
 
+**Traded model: `nbm-blend-v1` (ADR 0005).** The backtest showed `ens-v1.1` loses to the market, so it now only logs
+forecasts. The shadow trader acts on `TRADE_MODEL_VERSION` (default `nbm-blend-v1`). That model takes NOAA's National
+Blend of Models station bulletin (public domain, no key, one ~30 MB file per hourly cycle, downloaded once), calibrates
+it per station, and mixes it with each bucket's market mid. Its parameters live in `data/models/nbm_blend_v1.json`,
+refitted with `uv run python -m app.backtest.run --decision eve --test-start <day> --export data/models/nbm_blend_v1.json`.
+
 ## Strategy and shadow execution (milestone 5)
 
 `uv run python -m app.execution.shadow` simulates buys for the freshest forecasts (≤ 60 min old) against the freshest
