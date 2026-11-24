@@ -7,6 +7,7 @@ MODE defaults to shadow. Live trading needs all three conditions from the build 
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from functools import lru_cache
@@ -81,15 +82,14 @@ class Settings(BaseSettings):
         """Hosts like Neon hand out postgresql://... URLs; SQLAlchemy needs the psycopg driver named.
 
         Also forgives what tends to come along when a URL is pasted into a secret: surrounding
-        whitespace, matching quotes, a leading `psql ` (Neon's Connect panel offers that form),
-        or a `DATABASE_URL=` prefix.
+        whitespace or quotes, a leading `psql ` or `DATABASE_URL=`, and trailing command text such as
+        ` -At -c "..."`. A valid URL never contains unencoded whitespace or quotes, so the URL is the
+        run of characters from `postgres` up to the first of those.
         """
-        v = v.strip()
-        for lead in ("psql ", "DATABASE_URL="):
-            if v.startswith(lead):
-                v = v[len(lead):].strip()
-        if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
-            v = v[1:-1].strip()
+        m = re.search(r"postgres(?:ql)?://[^\s'\"]+", v)
+        if not m:
+            return v.strip()
+        v = m.group(0)
         for prefix in ("postgresql://", "postgres://"):
             if v.startswith(prefix):
                 return "postgresql+psycopg://" + v[len(prefix):]

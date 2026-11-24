@@ -77,6 +77,8 @@ def test_neon_style_url_gets_psycopg_driver() -> None:
     '"postgresql://u:p@h.neon.tech/db?sslmode=require"',
     "psql 'postgresql://u:p@h.neon.tech/db?sslmode=require'",
     "DATABASE_URL=postgresql://u:p@h.neon.tech/db?sslmode=require",
+    "postgresql://u:p@h.neon.tech/db?sslmode=require -At -c \"$Q\"",
+    "psql 'postgresql://u:p@h.neon.tech/db?sslmode=require' -At -c \"$Q\"",
 ])
 def test_pasted_url_variants_are_cleaned(pasted: str) -> None:
     from sqlalchemy import make_url
