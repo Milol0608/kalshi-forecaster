@@ -49,9 +49,10 @@ jobs:
         run: uv run alembic upgrade head
 
       - name: Check schema matches the models
-        # Reports constraints or indexes a restored copy is missing. Doesn't block the run.
+        # Adds indexes/constraints a restored copy is missing (a no-op once it matches) and
+        # reports anything it can't fix. Doesn't block the run.
         continue-on-error: true
-        run: uv run python -m app.jobs.schema_check
+        run: uv run python -m app.jobs.schema_check --repair
 
       - name: Run all jobs once (settle, scan, weather, forecast, shadow, retention)
         run: uv run python -m app.jobs.schedule --once
