@@ -331,3 +331,32 @@ class ApiCost(Base):
     calls: Mapped[int] = mapped_column(Integer)
     quota_units: Mapped[float] = mapped_column(Float)  # provider's own accounting, e.g. Open-Meteo x-ratelimit-cost
     cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6))
+
+
+class MakerOrder(Base):
+    """A simulated resting (maker) limit order, filled only when Kalshi's real trade tape trades
+    through its price (alpaca-trader/docs/RESEARCH.md, K2). Kept apart from the taker bankroll.
+
+    status: open -> filled -> settled, or open -> expired (market closed without a fill)."""
+
+    __tablename__ = "maker_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ticker: Mapped[str] = mapped_column(ForeignKey("markets.ticker"))
+    event_ticker: Mapped[str] = mapped_column(String(128), index=True)
+    rule: Mapped[str] = mapped_column(String(32))
+    side: Mapped[str] = mapped_column(String(3))       # yes | no: the side we buy
+    price: Mapped[Decimal] = mapped_column(Numeric(6, 4))
+    contracts: Mapped[Decimal] = mapped_column(Count)
+    yes_bid: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    yes_ask: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    checked_through: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    filled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    fill_trade_price: Mapped[Decimal | None] = mapped_column(Numeric(6, 4))
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    payout: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    pnl: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+
+    __table_args__ = (UniqueConstraint("ticker", "rule", name="uq_maker_orders_ticker_rule"),)

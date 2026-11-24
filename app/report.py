@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, check_live_gate
-from app.db.models import ApiCost, BankrollSnapshot, Forecast, Market, Position, Run, Settlement
+from app.db.models import ApiCost, BankrollSnapshot, Forecast, MakerOrder, Market, Position, Run, Settlement
 from app.metrics.scoring import VersionScore, pnl, score_versions
 
 MONTHLY_COST_WARNING = Decimal("10")
@@ -101,6 +101,21 @@ def build_report(session: Session, settings: Settings, now: datetime | None = No
     units_day = session.execute(
         select(ApiCost.provider, func.sum(ApiCost.quota_units)).where(ApiCost.at >= now - timedelta(days=1)).group_by(ApiCost.provider)
     ).all()
+    lines.append("\nMAKER SHADOW, K2 rule B1 (buy YES at the bid on evening favorites; fills from the real tape)")
+    orders = list(session.scalars(select(MakerOrder)))
+    if not orders:
+        lines.append("  no orders yet (posts at 8pm local standard time the evening before each market's day)")
+    else:
+        by = {st: [o for o in orders if o.status == st] for st in ("open", "filled", "expired", "settled")}
+        done = by["settled"]
+        decided = len(done) + len(by["filled"]) + len(by["expired"])
+        fill_rate = (len(done) + len(by["filled"])) / decided if decided else 0.0
+        net = sum((o.pnl or Decimal(0) for o in done), Decimal(0))
+        per = net / sum((o.contracts for o in done), Decimal(0)) * 100 if done else Decimal(0)
+        lines.append(f"  posted {len(orders)}   open {len(by['open'])}   filled awaiting result {len(by['filled'])}   "
+                     f"expired unfilled {len(by['expired'])}   settled {len(done)}")
+        lines.append(f"  fill rate {fill_rate:.0%} (backtest 89%)   net ${net:+.2f}   {per:+.1f}c per contract "
+                     f"(backtest +7.1c)")
     lines.append("\nCOSTS AND QUOTAS")
     lines.append(f"  API spend, last 30 days: ${cost_30d:.2f}"
                  + ("   WARNING: above $10/month" if cost_30d > MONTHLY_COST_WARNING else ""))

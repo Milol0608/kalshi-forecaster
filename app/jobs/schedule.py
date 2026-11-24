@@ -128,7 +128,17 @@ def pipeline(settings: Settings) -> None:
     step("scan", scan, settings)
     step("weather", weather, settings)
     step("forecast", forecast, settings)
+    def maker(session: Session, run_id: int) -> str:
+        from app.execution.maker import run_maker
+
+        with KalshiClient(settings.market_data_base_url,
+                          max_requests_per_second=settings.kalshi_max_requests_per_second) as client:
+            r = run_maker(session, client, stations, now())
+        return (f"posted {r.posted}, filled {r.filled}, expired {r.expired}, settled {r.settled}, "
+                f"P&L ${r.pnl:+.2f} | skipped {dict(r.skipped)}")
+
     step("shadow", shadow, settings)
+    step("maker", maker, settings)
 
 
 def settle_job(settings: Settings) -> None:
