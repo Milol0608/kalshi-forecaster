@@ -65,3 +65,16 @@ Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Where-Object { $_.Co
 Neon's free tier caps storage at 1 GB. The hourly retention step deletes snapshots older than 14 days that no
 forecast or trade referenced, and empties raw weather responses after 7 days (the parsed values stay). Anything a
 decision used is kept forever.
+
+## Hourly trigger (cron-job.org)
+GitHub's built-in `schedule:` never fired for this repo, so a free cron-job.org job starts each run instead
+(set up 2026-11-24).
+- **Token:** a fine-grained personal access token. It has access only to `kalshi-forecaster`, with Actions:
+  Read and write and nothing else. It expires 2027-02-22, so renew it before then and paste the new one into the job.
+- **Job:** every hour. `POST https://api.github.com/repos/Milol0608/kalshi-forecaster/actions/workflows/shadow.yml/dispatches`,
+  body `{"ref":"main"}`, headers `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`,
+  `X-GitHub-Api-Version: 2026-03-10`, `Content-Type: application/json`. Success is `200`.
+- **Failure emails** are on. cron-job.org disables a job after 25 failures in a row.
+- **The report's RUNS section** shows how many of the last 24 hours had a run, and flags any gap over 2 h.
+- If the token might have leaked, delete it on GitHub (Settings → Developer settings → Fine-grained tokens) and
+  make a new one. cron-job.org may store request headers unencrypted, which is why the token can only start runs.

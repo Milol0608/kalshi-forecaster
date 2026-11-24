@@ -1,13 +1,14 @@
 # Hourly shadow run on GitHub's free runners, against a free Neon Postgres.
-# Public repo: standard GitHub-hosted runners are free. GitHub runs schedules best-effort,
-# so a run can start late or occasionally be skipped; the pipeline tolerates both.
 # Shadow mode only: no Kalshi keys are needed or provided here.
+#
+# Triggered every hour by cron-job.org calling GitHub's workflow-dispatch API with a fine-grained
+# token limited to this repo's Actions (see docs/HOSTING.md). GitHub's own `schedule:` trigger
+# never fired for this repo (2026-11-23/24), so it's removed: if it woke up later, the bot would
+# run twice an hour. The report flags gaps in the hourly runs.
 name: shadow
 
 on:
-  schedule:
-    - cron: "17 * * * *"  # :17 past each hour; GitHub warns the top of the hour is when runs get delayed
-  workflow_dispatch: {}   # "Run workflow" button for a manual run
+  workflow_dispatch: {}   # called hourly by cron-job.org; also the "Run workflow" button
 
 concurrency:
   group: shadow

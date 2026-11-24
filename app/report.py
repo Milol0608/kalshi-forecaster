@@ -33,6 +33,21 @@ def verdict(s: VersionScore) -> str:
     return "Model is ahead of the market so far, but the interval includes zero: not proven."
 
 
+def schedule_health(session: Session, now: datetime, max_gap_hours: float = 2.0) -> list[str]:
+    """How regularly the hourly pipeline actually ran. The trigger lives outside this repo
+    (cron-job.org calling GitHub), so a stopped trigger only shows up as missing runs."""
+    starts = sorted(session.scalars(select(Run.started_at).where(
+        Run.job == "scan", Run.started_at >= now - timedelta(days=1))))
+    if not starts:
+        return ["  ATTENTION: no pipeline run in the last 24h; check the cron-job.org trigger."]
+    gaps = [(b - a).total_seconds() / 3600 for a, b in zip([now - timedelta(days=1)] + starts, starts + [now])]
+    hours = len({t.replace(minute=0, second=0, microsecond=0) for t in starts})
+    out = [f"  pipeline ran in {hours} of the last 24 hours; longest gap {max(gaps):.1f} h"]
+    if max(gaps) > max_gap_hours:
+        out.append(f"  ATTENTION: a gap over {max_gap_hours:g} h; check the cron-job.org trigger's history.")
+    return out
+
+
 def build_report(session: Session, settings: Settings, now: datetime | None = None) -> str:
     now = now or datetime.now(timezone.utc)
     lines = [f"KALSHI FORECASTER REPORT  {now:%Y-%m-%d %H:%M} UTC   mode={settings.mode.value}", "=" * 72]
@@ -94,6 +109,7 @@ def build_report(session: Session, settings: Settings, now: datetime | None = No
     failed = [r for r in runs if r[1] == "failed"]
     if failed:
         lines.append("  ATTENTION: some runs failed; see the runs table `error` column.")
+    lines.extend(schedule_health(session, now))
     pending = session.scalar(select(func.count()).select_from(Forecast).where(Forecast.decided_at >= now - timedelta(days=1)))
     lines.append(f"  forecasts logged in last 24h: {pending}")
 
