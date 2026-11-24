@@ -5,8 +5,9 @@ which `alembic upgrade` can't see because the version stamp still says it's up t
 Prints table/constraint names only, never data or connection details.
 
   python -m app.jobs.schema_check            report; exit 1 on any difference
-  python -m app.jobs.schema_check --repair   add missing indexes, unique constraints and
-                                             foreign keys (only those; anything else is reported)
+  python -m app.jobs.schema_check --repair   add missing primary keys, indexes, unique
+                                             constraints and foreign keys (only those; anything
+                                             else is reported)
 """
 
 from __future__ import annotations
@@ -15,17 +16,27 @@ import sys
 
 from alembic.autogenerate import compare_metadata
 from alembic.migration import MigrationContext
-from sqlalchemy import Connection, Engine
+from sqlalchemy import Connection, Engine, inspect
 from sqlalchemy.schema import AddConstraint, CreateIndex
 
 from app.db.models import Base
 from app.db.session import get_engine
 
-REPAIRABLE = {"add_index", "add_constraint", "add_fk"}
+REPAIRABLE = {"add_pk", "add_index", "add_constraint", "add_fk"}
+ORDER = {"add_pk": 0, "add_index": 1, "add_constraint": 1, "add_fk": 2}  # FKs need their target's key
+
+
+def missing_primary_keys(conn: Connection) -> list:
+    """compare_metadata doesn't report a missing primary key, so check those separately."""
+    insp = inspect(conn)
+    existing = set(insp.get_table_names())
+    return [("add_pk", t.primary_key) for t in Base.metadata.sorted_tables
+            if t.name in existing and t.primary_key.columns
+            and not insp.get_pk_constraint(t.name).get("constrained_columns")]
 
 
 def differences(conn: Connection) -> list:
-    return compare_metadata(MigrationContext.configure(conn), Base.metadata)
+    return missing_primary_keys(conn) + compare_metadata(MigrationContext.configure(conn), Base.metadata)
 
 
 def describe(diff) -> str:
@@ -42,8 +53,7 @@ def repair(engine: Engine) -> tuple[int, list[str]]:
     with engine.connect() as conn:
         diffs = differences(conn)
     added, failed = 0, []
-    # Indexes and unique constraints first, so foreign keys find their targets indexed.
-    for diff in sorted(diffs, key=lambda d: isinstance(d, list) or d[0] == "add_fk"):
+    for diff in sorted(diffs, key=lambda d: 9 if isinstance(d, list) else ORDER.get(d[0], 9)):
         if isinstance(diff, list) or diff[0] not in REPAIRABLE:
             failed.append(f"not repairable here: {describe(diff)}")
             continue

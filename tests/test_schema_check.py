@@ -26,3 +26,21 @@ def test_repair_restores_dropped_index_unique_and_fk() -> None:
     with engine.connect() as conn:
         assert differences(conn) == []
         assert conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE conname = 'shadow_orders_forecast_id_fkey'")) == 1
+
+
+def test_repair_restores_primary_key_before_foreign_keys_that_need_it() -> None:
+    engine = get_engine()
+    with engine.begin() as conn:
+        n_fk = conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE contype = 'f'"))
+        conn.execute(text("ALTER TABLE runs DROP CONSTRAINT runs_pkey CASCADE"))  # also drops FKs to runs
+        assert conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE contype = 'f'")) < n_fk
+    with engine.connect() as conn:
+        assert ("add_pk" in {d[0] for d in differences(conn) if not isinstance(d, list)})
+
+    added, failed = repair(engine)
+
+    assert failed == []
+    with engine.connect() as conn:
+        assert differences(conn) == []
+        assert conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE contype = 'f'")) == n_fk
+        assert conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE conname = 'runs_pkey'")) == 1
