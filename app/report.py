@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, check_live_gate
-from app.db.models import ApiCost, BankrollSnapshot, Forecast, Run
+from app.db.models import ApiCost, BankrollSnapshot, Forecast, Market, Position, Run, Settlement
 from app.metrics.scoring import VersionScore, pnl, score_versions
 
 MONTHLY_COST_WARNING = Decimal("10")
@@ -79,6 +79,14 @@ def build_report(session: Session, settings: Settings, now: datetime | None = No
     lines.append("\nSHADOW P&L (simulated, no real money)")
     lines.append(f"  filled orders: {p.filled_orders}   settled positions: {p.settled_positions}   "
                  f"open positions: {p.open_positions} (${p.open_cost:.2f} at cost)")
+    for pos, mkt, st in session.execute(
+            select(Position, Market, Settlement).join(Market, Market.ticker == Position.ticker, isouter=True)
+            .join(Settlement, Settlement.ticker == Position.ticker, isouter=True)
+            .where(Position.status == "open").order_by(Position.opened_at)).all():
+        lines.append(f"    open: {pos.ticker} {pos.side} x{pos.contracts} opened {pos.opened_at:%Y-%m-%d %H:%M}  "
+                     f"closes {mkt.close_time:%Y-%m-%d %H:%M} status {mkt.status}  " if mkt else
+                     f"    open: {pos.ticker} (no market row)  ")
+        lines[-1] += f"result {st.result if st else 'none yet'}"
     lines.append(f"  gross (before fees):   ${p.gross:+.2f}")
     lines.append(f"  fees:                  ${-p.fees:+.2f}")
     lines.append(f"  net of fees:           ${p.net_of_fees:+.2f}")

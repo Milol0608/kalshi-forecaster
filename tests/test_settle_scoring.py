@@ -123,6 +123,33 @@ def test_resolving_twice_does_not_pay_twice(db_session: Session, settings: Setti
     assert second.positions_settled == 0 and pos.payout == D(2)
 
 
+def test_stranded_position_settles_from_an_earlier_result(db_session: Session, settings: Settings) -> None:
+    """The result was recorded earlier (a cancelled run, or a copied database) and the market already
+    looks final, but the position is still open: it must settle anyway."""
+    add_market(db_session, "TS-F")
+    db_session.flush()
+    db_session.get(Market, "TS-F").status = "finalized"  # type: ignore[union-attr]
+    db_session.add(Settlement(ticker="TS-F", result="no", settlement_value=D(0), expiration_value="61.00",
+                              settled_at=NOW - timedelta(hours=2), fetched_at=NOW - timedelta(hours=1),
+                              status="finalized"))
+    pos = add_position(db_session, "TS-F", "no", "3", "2.00")
+    db_session.flush()
+    r = resolve(db_session, client_returning([settled_market("TS-F", "no")]), settings, clock=lambda: NOW)
+    assert (r.newly_settled, r.positions_settled) == (0, 1)
+    assert pos.status == "settled" and pos.payout == D(3) and pos.pnl == D(1)
+
+
+def test_final_status_without_result_is_rechecked_while_a_position_is_open(
+        db_session: Session, settings: Settings) -> None:
+    add_market(db_session, "TS-G")
+    db_session.flush()
+    db_session.get(Market, "TS-G").status = "finalized"  # type: ignore[union-attr]
+    pos = add_position(db_session, "TS-G", "yes", "1", "0.40")
+    db_session.flush()
+    r = resolve(db_session, client_returning([settled_market("TS-G", "yes")]), settings, clock=lambda: NOW)
+    assert r.checked == 1 and pos.status == "settled" and pos.payout == D(1)
+
+
 # --- scheduler -----------------------------------------------------------------
 
 def test_failing_step_is_recorded_and_does_not_raise(settings: Settings) -> None:

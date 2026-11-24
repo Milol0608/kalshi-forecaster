@@ -52,8 +52,12 @@ def resolve(
 ) -> ResolveResult:
     now = clock()
     result = ResolveResult()
+    # A market with an open position is re-checked even if its status already looks final: a run
+    # cancelled mid-way, or a status recorded before Kalshi published the result, must not strand it.
+    has_open = select(Position.ticker).where(Position.status == "open")
     pending = list(session.scalars(
-        select(Market).where(Market.close_time <= now, Market.status.not_in(FINAL_STATUSES))
+        select(Market).where(Market.close_time <= now,
+                             Market.status.not_in(FINAL_STATUSES) | Market.ticker.in_(has_open))
     ))
     result.checked = len(pending)
     by_ticker = {m.ticker: m for m in pending}
@@ -73,10 +77,14 @@ def resolve(
             )
             session.add(s)
             result.newly_settled += 1
-            for pos in session.scalars(select(Position).where(Position.ticker == market.ticker, Position.status == "open")):
-                settle_position(pos, s)
-                result.positions_settled += 1
-                result.pnl += pos.pnl or 0
+    session.flush()
+    # Settle every open position whose market has a result, whether that result was recorded in
+    # this run or an earlier one.
+    for pos, s in session.execute(select(Position, Settlement).join(Settlement, Settlement.ticker == Position.ticker)
+                                  .where(Position.status == "open")).all():
+        settle_position(pos, s)
+        result.positions_settled += 1
+        result.pnl += pos.pnl or 0
     session.flush()
     if result.positions_settled:
         acct = load_account(session, settings)
