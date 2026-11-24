@@ -48,6 +48,11 @@ jobs:
       - name: Migrate database
         run: uv run alembic upgrade head
 
+      - name: Check schema matches the models
+        # Reports constraints or indexes a restored copy is missing. Doesn't block the run.
+        continue-on-error: true
+        run: uv run python -m app.jobs.schema_check
+
       - name: Run all jobs once (settle, scan, weather, forecast, shadow, retention)
         run: uv run python -m app.jobs.schedule --once
 
