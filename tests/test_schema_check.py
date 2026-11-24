@@ -44,3 +44,23 @@ def test_repair_restores_primary_key_before_foreign_keys_that_need_it() -> None:
         assert differences(conn) == []
         assert conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE contype = 'f'")) == n_fk
         assert conn.scalar(text("SELECT count(*) FROM pg_constraint WHERE conname = 'runs_pkey'")) == 1
+
+
+def test_repair_syncs_sequence_and_renumbers_ids_reused_after_a_restore() -> None:
+    engine = get_engine()
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO runs (job, mode, status) VALUES ('t', 'shadow', 'ok'), ('t', 'shadow', 'ok')"))
+        top = conn.scalar(text("SELECT max(id) FROM runs"))
+        conn.execute(text("ALTER TABLE runs DROP CONSTRAINT runs_pkey CASCADE"))
+        conn.execute(text("SELECT setval(pg_get_serial_sequence('runs', 'id'), :v)"), {"v": top - 1})
+        conn.execute(text("INSERT INTO runs (job, mode, status) VALUES ('t', 'shadow', 'ok')"))  # reuses id = top
+        assert conn.scalar(text("SELECT count(*) FROM runs WHERE id = :v"), {"v": top}) == 2
+
+    added, failed = repair(engine)
+
+    assert failed == []
+    with engine.connect() as conn:
+        assert differences(conn) == []
+        assert conn.scalar(text("SELECT count(*) - count(DISTINCT id) FROM runs")) == 0
+    with engine.begin() as conn:  # a new row no longer collides
+        conn.execute(text("INSERT INTO runs (job, mode, status) VALUES ('t', 'shadow', 'ok')"))
