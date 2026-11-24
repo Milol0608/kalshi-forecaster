@@ -28,7 +28,8 @@ from pathlib import Path
 import numpy as np
 
 from app.backtest.data import CACHE, LEAD_FOR, bucket_range, event_date, load_observations, series_stations
-from app.backtest.models import Emos, bucket_probs, fit_blend, fit_emos
+from app.backtest import nbm
+from app.backtest.models import Emos, NbmEmos, bucket_probs, fit_blend, fit_emos, fit_nbm_emos
 from app.config import get_settings
 from app.evidence.stations import load_stations
 from app.kalshi.fees import order_fee
@@ -120,6 +121,17 @@ def main() -> None:
                                np.array([obs[c][d] for d in days]))
     print(f"EMOS fitted for {len(emos)}/{len(forecasts)} stations (>= 120 training days each)")
 
+    # ---- NOAA National Blend of Models: raw, and calibrated per station on the training period ----
+    all_days = [first_day + timedelta(days=k) for k in range((date.today() - first_day).days)]
+    nbm_feat = nbm.features({c: stations[c] for c in forecasts}, args.decision, all_days)
+    nbm_emos: dict[str, NbmEmos] = {}
+    for c, fc in nbm_feat.items():
+        days = [d for d in fc if d in obs[c] and date.fromisoformat(d) < test_start]
+        if len(days) >= 120:
+            nbm_emos[c] = fit_nbm_emos(*(np.array([fc[d][k] for d in days], dtype=float) for k in ("txn", "tmax", "xnd")),
+                                       np.array([obs[c][d] for d in days], dtype=float))
+    print(f"NBM: {sum(map(len, nbm_feat.values()))} station-days; calibrated for {len(nbm_emos)} stations")
+
     # ---- the 'current' model: rolling 30-day bias + error SD, like live v1.1 ----
     def current(c: str, d: date) -> tuple[float, float] | None:
         fc, ob = forecasts[c], obs[c]
@@ -149,6 +161,8 @@ def main() -> None:
     rows: list[Row] = []
     p_cur: list[float] = []
     p_emos: list[float] = []
+    p_nraw: list[float] = []
+    p_nbm: list[float] = []
     skipped = defaultdict(int)
     for ev, ms in events.items():
         ms.sort(key=lambda x: x[1])
@@ -167,15 +181,24 @@ def main() -> None:
         if cur is None or c not in emos or "gfs" not in fc or "ecmwf" not in fc:
             skipped["not enough history for a model"] += 1
             continue
+        nf = nbm_feat.get(c, {}).get(d.isoformat())
+        if nf is None or c not in nbm_emos:
+            skipped["no NBM bulletin before the decision"] += 1
+            continue
         em_mu, em_sd = emos[c].predict(np.array([fc["gfs"]]), np.array([fc["ecmwf"]]))
         pc = bucket_probs(cur[0], cur[1], rngs)
         pe = bucket_probs(float(em_mu[0]), float(em_sd[0]), rngs)
-        for (m, r), a, b in zip(ms, pc, pe):
+        pnr = bucket_probs(float(nf["txn"]), max(float(nf["xnd"]), 1.0), rngs)
+        n_mu, n_sd = nbm_emos[c].predict(*(np.array([float(nf[k])]) for k in ("txn", "tmax", "xnd")))
+        pn = bucket_probs(float(n_mu[0]), float(n_sd[0]), rngs)
+        for (m, r), a, b, nr, nn in zip(ms, pc, pe, pnr, pn):
             pr = prices[m["ticker"]]
             rows.append(Row(ev, c, d, m["ticker"], r[0], r[1], 1 if m["result"] == "yes" else 0,
                             float(pr["bid"]), float(pr["ask"])))
             p_cur.append(float(a))
             p_emos.append(float(b))
+            p_nraw.append(float(nr))
+            p_nbm.append(float(nn))
     print(f"scored markets: {len(rows)} in {len({r.event for r in rows})} events; skipped events {dict(skipped)}")
 
     y = np.array([r.y for r in rows], dtype=float)
@@ -183,13 +206,20 @@ def main() -> None:
     pc_a, pe_a = np.array(p_cur), np.array(p_emos)
     train = np.array([r.day < test_start for r in rows])
     test = ~train
-    blend = fit_blend(pe_a[train], mid[train], y[train])
-    pb = blend.predict(pe_a, mid)
-    sums: dict[str, float] = defaultdict(float)
-    for r, p in zip(rows, pb):
-        sums[r.event] += p
-    pb = np.array([p / sums[r.event] for r, p in zip(rows, pb)])  # renormalise each event to 1
-    print(f"blend weights (on logits): intercept {blend.params[0]:+.3f}, model {blend.params[1]:+.3f}, market {blend.params[2]:+.3f}")
+    pnr_a, pn_a = np.array(p_nraw), np.array(p_nbm)
+
+    def blended(p_model: np.ndarray, label: str):
+        b = fit_blend(p_model[train], mid[train], y[train])
+        pb = b.predict(p_model, mid)
+        sums: dict[str, float] = defaultdict(float)
+        for r, p in zip(rows, pb):
+            sums[r.event] += p
+        print(f"{label} weights (on logits): intercept {b.params[0]:+.3f}, model {b.params[1]:+.3f}, market {b.params[2]:+.3f}")
+        return b, np.array([p / sums[r.event] for r, p in zip(rows, pb)])  # renormalise each event to 1
+
+    blend, pb = blended(pe_a, "blend")
+    nbm_blend, pnb = blended(pn_a, "nbm_blend")
+    models = {"current": pc_a, "emos": pe_a, "blend": pb, "nbm_raw": pnr_a, "nbm": pn_a, "nbm_blend": pnb}
 
     ev_test = [r.event for r, t in zip(rows, test) if t]
     print(f"\nTEST PERIOD {test_start} .. : {int(test.sum())} markets, {len(set(ev_test))} events "
@@ -197,7 +227,7 @@ def main() -> None:
     print(f"{'model':<10}{'Brier':>9}{'LogLoss':>9}   gap vs market (+ = beats market), 95% CI over events")
     print(f"{'market':<10}{brier(mid[test], y[test]):>9.4f}{logloss(mid[test], y[test]):>9.4f}")
     results = {}
-    for name, p in (("current", pc_a), ("emos", pe_a), ("blend", pb)):
+    for name, p in models.items():
         g, lo, hi = boot_gap(ev_test, mid[test], p[test], y[test])
         results[name] = (g, lo, hi)
         tag = "BEATS MARKET" if lo > 0 else ("WORSE THAN MARKET" if hi < 0 else "not distinguishable")
@@ -206,7 +236,8 @@ def main() -> None:
 
     # ---- approximate trading simulation on the test period ----
     print(f"\nAPPROX. SHADOW TRADING on test period (buy at historical ask, <= {MAX_CONTRACTS_PER_ORDER} contracts/order)")
-    for name, p in (("current", pc_a), ("emos", pe_a), ("blend", pb)):
+    sim = {}
+    for name, p in models.items():
         equity = Decimal(str(settings.starting_bankroll))
         peak, max_dd, trades, wins = equity, 0.0, 0, 0
         by_day: dict[date, list[int]] = defaultdict(list)
@@ -252,10 +283,12 @@ def main() -> None:
             peak = max(peak, equity)
             max_dd = max(max_dd, float(1 - equity / peak))
         rate = f"{wins / trades:.0%}" if trades else "-"
-        print(f"  {name:<8} trades {trades:>5}  win rate {rate:>4}  final bankroll ${equity:>9.2f}  max drawdown {max_dd:.0%}")
+        sim[name] = {"trades": trades, "wins": wins, "final": float(equity), "max_dd": max_dd}
+        print(f"  {name:<9} trades {trades:>5}  win rate {rate:>4}  final bankroll ${equity:>9.2f}  max drawdown {max_dd:.0%}")
 
     out = {"test_start": test_start.isoformat(), "emos": {c: e.params.tolist() for c, e in emos.items()},
-           "blend": blend.params.tolist(), "results": results}
+           "blend": blend.params.tolist(), "results": results, "sim": sim,
+           "nbm_emos": {c: e.params.tolist() for c, e in nbm_emos.items()}, "nbm_blend": nbm_blend.params.tolist()}
     out["decision"] = args.decision
     path = Path(f"data/backtest/results_{args.decision}.json")
     path.write_text(json.dumps(out, indent=1), encoding="utf-8")

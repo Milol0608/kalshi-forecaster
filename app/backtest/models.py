@@ -57,6 +57,30 @@ def fit_emos(gfs: np.ndarray, ecmwf: np.ndarray, obs: np.ndarray) -> Emos:
     return Emos(res.x)
 
 
+@dataclass
+class NbmEmos:
+    """NBM calibrated per station: mean from NBM's daytime max plus how far the 3-hourly
+    temperatures inside the climate day run above it; spread scaled from NBM's own SD."""
+
+    params: np.ndarray  # a, b, c, d, e
+
+    def predict(self, txn: np.ndarray, tmax: np.ndarray, xnd: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        a, b, c, d, e = self.params
+        mu = a + b * txn + c * np.maximum(tmax - txn, 0)
+        sd = np.exp(d + e * np.log(np.maximum(xnd, 0.5)))
+        return mu, sd
+
+
+def fit_nbm_emos(txn: np.ndarray, tmax: np.ndarray, xnd: np.ndarray, obs: np.ndarray) -> NbmEmos:
+    def loss(p: np.ndarray) -> float:
+        mu, sd = NbmEmos(p).predict(txn, tmax, xnd)
+        return float(np.mean(crps_gaussian(obs, mu, sd)))
+
+    start = np.array([0.0, 1.0, 0.5, np.log(1.5), 0.5])
+    res = minimize(loss, start, method="Nelder-Mead", options={"maxiter": 6000, "xatol": 1e-4, "fatol": 1e-6})
+    return NbmEmos(res.x)
+
+
 def logit(p: np.ndarray) -> np.ndarray:
     p = np.clip(p, EPS, 1 - EPS)
     return np.log(p / (1 - p))
