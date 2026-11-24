@@ -90,6 +90,8 @@ def download(client: KalshiClient, base: str) -> None:
     by_day: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for m in todo:
         by_day[int(eve(m).timestamp())].append(m)  # type: ignore[union-attr]
+    # Phase A: live markets, batched per decision time. Markets the batch doesn't return are archived.
+    archived: list[tuple[dict[str, Any], int]] = []
     for i, (t, ms) in enumerate(sorted(by_day.items())):
         for j in range(0, len(ms), 100):
             chunk = ms[j:j + 100]
@@ -99,16 +101,53 @@ def download(client: KalshiClient, base: str) -> None:
             got = {e["market_ticker"]: e.get("candlesticks", []) for e in resp.get("markets", [])}
             for m in chunk:
                 cs = got.get(m["ticker"])
-                if not cs:  # archived: one request per market
-                    try:
-                        cs = client.get(f"/historical/markets/{m['ticker']}/candlesticks",
-                                        {"start_ts": t - 3 * 3600, "end_ts": t, "period_interval": 60}).get("candlesticks", [])
-                    except Exception:
-                        cs = []
-                prices[m["ticker"]] = pick(cs, t) if cs else None
-        if i % 25 == 0:
+                if cs:
+                    prices[m["ticker"]] = pick(cs, t)
+                else:
+                    archived.append((m, t))
+        if i % 100 == 0:
             ppath.write_text(json.dumps(prices), encoding="utf-8")
-            print(f"  prices: {i}/{len(by_day)} decision times, {len(prices)} markets", flush=True)
+            print(f"  live prices: {i}/{len(by_day)} decision times, {len(archived)} archived queued", flush=True)
+    ppath.write_text(json.dumps(prices), encoding="utf-8")
+
+    # Phase B: archived markets need one request each; 6 workers share one pacing gate (<= 8/s).
+    import threading
+    import time
+    from concurrent.futures import ThreadPoolExecutor
+
+    gate, lock, next_slot = threading.Lock(), threading.Lock(), [time.monotonic()]
+
+    def fetch(item: tuple[dict[str, Any], int], http: httpx.Client) -> tuple[str, dict[str, str] | None]:
+        m, t = item
+        for attempt in range(6):
+            with gate:
+                wait = next_slot[0] - time.monotonic()
+                next_slot[0] = max(next_slot[0], time.monotonic()) + 1 / 8
+            if wait > 0:
+                time.sleep(wait)
+            try:
+                r = http.get(f"{base}/historical/markets/{m['ticker']}/candlesticks",
+                             params={"start_ts": t - 3 * 3600, "end_ts": t, "period_interval": 60})
+            except httpx.TransportError:
+                time.sleep(2 ** attempt)
+                continue
+            if r.status_code in (429, 500, 502, 503, 504):
+                time.sleep(float(r.headers.get("Retry-After") or 2 ** attempt))
+                continue
+            if r.status_code != 200:
+                return m["ticker"], None
+            cs = r.json().get("candlesticks", [])
+            return m["ticker"], (pick(cs, t) if cs else None)
+        raise RuntimeError(f"{m['ticker']}: gave up after retries")  # don't record a transient failure as "no price"
+
+    print(f"archived prices: {len(archived)} markets, 6 workers", flush=True)
+    with httpx.Client(timeout=30) as http, ThreadPoolExecutor(6) as pool:
+        for k, (tk, p) in enumerate(pool.map(lambda it: fetch(it, http), archived), 1):
+            with lock:
+                prices[tk] = p
+                if k % 1000 == 0:
+                    ppath.write_text(json.dumps(prices), encoding="utf-8")
+                    print(f"  archived prices: {k}/{len(archived)}", flush=True)
     ppath.write_text(json.dumps(prices), encoding="utf-8")
 
     cutoff_s = client.get("/historical/cutoff").get("trades_created_ts")
