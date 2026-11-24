@@ -17,25 +17,32 @@ scores each model against the market on months it wasn't trained on. Backtest re
 - **Scoring:** Brier and log loss, with a 95% CI from resampling whole city-days. Trading P&L is approximate
   (top-of-book prices only, ≤ 25 contracts per order).
 
-## Results
+## Results (final, 2026-11-23)
 
-**Interim, 2026-11-23** (about 60% of cities' archived prices downloaded). Train < 2026-03-01, test 2026-03-01 .. 2026-11-21:
+All 24 cities. Prices from Sep 2025 onward (earlier markets have forecasts and outcomes but no downloaded prices).
+EMOS trains on Mar 2024 – Feb 2026 forecasts vs observed highs. The blend trains on Sep 2025 – Feb 2026 markets.
+**Test: 2026-03-01 .. 2026-11-21**, never seen in training. Gap = market Brier − model Brier (+ = model better),
+95% CI from resampling whole city-days.
 
-| eve (8pm before) | Brier | Gap vs market (+ = model better) | $100 becomes |
-|---|---|---|---|
-| market | 0.1014 | | |
-| current | 0.1325 | −0.0311 [−0.0328, −0.0294] | $0.38 |
-| emos (v2) | 0.1314 | −0.0301 [−0.0319, −0.0283] | $0.37 |
-| blend | 0.1011 | +0.0003 [+0.0000, +0.0005] | $90.46 |
+| | eve Brier | eve gap [95% CI] | eve $100 → | am Brier | am gap [95% CI] | am $100 → |
+|---|---|---|---|---|---|---|
+| market | 0.1045 | | | 0.0953 | | |
+| current | 0.1321 | −0.0276 [−0.0290, −0.0262] | $0.37 | 0.1237 | −0.0284 [−0.0299, −0.0269] | $0.38 |
+| emos (v2) | 0.1320 | −0.0275 [−0.0289, −0.0261] | $0.39 | 0.1240 | −0.0287 [−0.0302, −0.0271] | $0.36 |
+| blend | 0.1034 | +0.0011 [+0.0008, +0.0014] | $89.56 | 0.0947 | +0.0006 [+0.0003, +0.0009] | $93.36 |
 
-21,708 test markets in 3,618 events. The blend's weights were model +0.015, market +1.18.
+eve: 33,786 test markets in 5,631 events. am: 34,038 in 5,673. Blend weights on logits: eve intercept +0.216,
+model +0.075, market +1.156; am +0.157 / +0.064 / +1.155.
 
-**Earlier check, `am` (8am on the day), recent 3 months:** market 0.0833, current 0.1232, emos 0.1237, blend 0.0833.
+## Decision
+- **The weather model is retired as a trading candidate.** Both versions are clearly worse than the market at both
+  decision times, and trading them loses the whole bankroll in simulation. It keeps logging in shadow at no cost.
+- **The blend beats the market statistically but not after costs.** Its gain comes from pushing the market's own
+  prices further from 50% (market weight 1.16), which suggests a small bias in how the market prices extremes. The
+  bias is smaller than the fees plus the bid/ask spread.
+- **Next, each through this same backtest before anything else:** (1) NOAA National Blend of Models probabilities,
+  (2) same-day high-resolution forecasts plus live observations, (3) market making (maker fees are 0 on these
+  series) to capture the spread and the extremes bias without paying taker fees, (4) other categories.
 
-## Conclusion so far
-Free global NWP forecasts are much less sharp than the Kalshi market, at both decision times. The market's implied
-error is about ±1.7°F the evening before, against ±2.5–3°F for these forecasts. Trading on the model loses
-everything in simulation, because the trades it favours are exactly where it's wrong. Blending with the market
-adds nothing that survives fees. Gate 1 would correctly block live trading. Beating this market would need
-materially better inputs (for example NWS National Blend probabilities, high-resolution short-range models, or
-same-day observations), not more tuning of this model.
+## Earlier interim run (about 60% of cities)
+eve: market 0.1014; current 0.1325; emos 0.1314; blend 0.1011. Superseded by the final table above.
