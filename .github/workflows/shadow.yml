@@ -1,11 +1,12 @@
 # Hourly shadow run on GitHub's free runners, against a free Neon Postgres.
-# Private repo budget: ~2,000 free minutes/month; one run/hour of ~1-2 min fits.
+# Public repo: standard GitHub-hosted runners are free. GitHub runs schedules best-effort,
+# so a run can start late or occasionally be skipped; the pipeline tolerates both.
 # Shadow mode only: no Kalshi keys are needed or provided here.
 name: shadow
 
 on:
   schedule:
-    - cron: "7 * * * *"   # :07 past each hour; GitHub warns the top of the hour is when runs get delayed
+    - cron: "17 * * * *"  # :17 past each hour; GitHub warns the top of the hour is when runs get delayed
   workflow_dispatch: {}   # "Run workflow" button for a manual run
 
 concurrency:
