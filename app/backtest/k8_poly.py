@@ -23,7 +23,7 @@ import numpy as np
 
 BASE = "https://gateway.polymarket.us"
 DIR = Path("data/backtest/k8")
-RATE = 8.0  # docs: 20/s public price-history limit, 25/s shared; stay well under
+RATE = 4.0  # docs: 20/s public price-history limit, 25/s shared; stay well under
 SPLIT = date(2026, 8, 1)
 LO, HI = 0.65, 0.95
 # NWS climate days use local STANDARD time all year: UTC offset in hours.
@@ -116,7 +116,16 @@ def download() -> None:
               f"no time zone for: {sorted({m['city'] for m in markets if m['city'] not in STD_OFFSET})}", flush=True)
         todo = [m for m in markets if m["slug"] not in done]
         with ThreadPoolExecutor(6) as pool, path.open("a", encoding="utf-8") as fh:
-            for i, r in enumerate(pool.map(lambda m: fetch(http, m), todo), 1):
+            def safe(m: dict) -> dict | None:
+                try:
+                    return fetch(http, m)
+                except RuntimeError as e:  # a burst of 5xx/429: leave it for the next pass, never store a gap
+                    print(f"  skipped for now: {e}", flush=True)
+                    return None
+
+            for i, r in enumerate(pool.map(safe, todo), 1):
+                if r is None:
+                    continue
                 fh.write(json.dumps(r) + "\n")
                 if i % 500 == 0:
                     fh.flush()
