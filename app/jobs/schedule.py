@@ -132,9 +132,13 @@ def pipeline(settings: Settings) -> None:
         from app.execution.maker import run_maker
 
         with KalshiClient(settings.market_data_base_url,
-                          max_requests_per_second=settings.kalshi_max_requests_per_second) as client:
-            r = run_maker(session, client, stations, now())
-        return (f"posted {r.posted}, filled {r.filled}, expired {r.expired}, settled {r.settled}, "
+                          max_requests_per_second=settings.kalshi_max_requests_per_second) as client, \
+                httpx.Client(timeout=30) as weather_http:
+            r = run_maker(session, client, stations, now(), weather=weather_http)
+        if r.forecast_calls:
+            session.add(ApiCost(run_id=run_id, at=now(), provider="open-meteo", endpoint="previous-runs (D1c)",
+                                calls=r.forecast_calls, quota_units=float(r.forecast_calls), cost_usd=Decimal(0)))
+        return (f"posted {r.posted} {dict(r.by_rule)}, filled {r.filled}, expired {r.expired}, settled {r.settled}, "
                 f"P&L ${r.pnl:+.2f} | skipped {dict(r.skipped)}")
 
     step("shadow", shadow, settings)

@@ -358,5 +358,9 @@ class MakerOrder(Base):
     settled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     payout: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
     pnl: Mapped[Decimal | None] = mapped_column(Numeric(12, 6))
+    # ADR 0007: the model's edge (D1c), through-volume seen by close and contracts counted as filled (Kelly arms)
+    edge: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    thru_volume: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    filled_contracts: Mapped[Decimal | None] = mapped_column(Count)
 
     __table_args__ = (UniqueConstraint("ticker", "rule", name="uq_maker_orders_ticker_rule"),)

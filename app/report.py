@@ -48,6 +48,41 @@ def schedule_health(session: Session, now: datetime, max_gap_hours: float = 2.0)
     return out
 
 
+MAKER_ARMS = (
+    ("B1-fav-bid", "B1, 1 contract (v1 rule)"),
+    ("B1-kelly", "B1, 1/4 Kelly"),
+    ("D1c-kelly", "D1c decider + forecasts, 1/4 Kelly"),
+)
+
+
+def maker_section(session: Session) -> list[str]:
+    """The three maker paper arms side by side (ADR 0006, ADR 0007); each Kelly arm starts with $100."""
+    lines = ["\nMAKER SHADOW: three paper arms on the same live markets (fills from the real tape)"]
+    orders = list(session.scalars(select(MakerOrder)))
+    if not orders:
+        return lines + ["  no orders yet (posts at 8pm local standard time the evening before each market's day)"]
+    lines.append(f"  {'arm':<36}{'posted':>7}{'open':>6}{'filled':>7}{'expired':>8}{'settled':>8}{'net $':>9}"
+                 f"{'c/contract':>11}{'bankroll':>10}{'worst drop':>11}")
+    for rule, label in MAKER_ARMS:
+        mine = [o for o in orders if o.rule == rule]
+        by = {st: [o for o in mine if o.status == st] for st in ("open", "filled", "expired", "settled")}
+        done = sorted(by["settled"], key=lambda o: o.settled_at or o.posted_at)
+        net = sum((o.pnl or Decimal(0) for o in done), Decimal(0))
+        n = sum(((o.filled_contracts if o.filled_contracts is not None else o.contracts) for o in done), Decimal(0))
+        per = net / n * 100 if n else Decimal(0)
+        bank = peak = Decimal(100)
+        worst = Decimal(0)
+        for o in done:
+            bank += o.pnl or Decimal(0)
+            peak = max(peak, bank)
+            worst = max(worst, 1 - bank / peak)
+        lines.append(f"  {label:<36}{len(mine):>7}{len(by['open']):>6}{len(by['filled']):>7}{len(by['expired']):>8}"
+                     f"{len(done):>8}{net:>+9.2f}{per:>+10.1f}c{bank:>10.2f}{worst:>11.0%}")
+    lines.append("  Backtest Aug-Nov 2026 from $100: B1 1 contract $113, B1 1/4 Kelly $140, D1c 1/4 Kelly $187 "
+                 "(D1c's per-bet edge was not significant). Bankroll = $100 + settled P&L.")
+    return lines
+
+
 def build_report(session: Session, settings: Settings, now: datetime | None = None) -> str:
     now = now or datetime.now(timezone.utc)
     lines = [f"KALSHI FORECASTER REPORT  {now:%Y-%m-%d %H:%M} UTC   mode={settings.mode.value}", "=" * 72]
@@ -101,21 +136,7 @@ def build_report(session: Session, settings: Settings, now: datetime | None = No
     units_day = session.execute(
         select(ApiCost.provider, func.sum(ApiCost.quota_units)).where(ApiCost.at >= now - timedelta(days=1)).group_by(ApiCost.provider)
     ).all()
-    lines.append("\nMAKER SHADOW, K2 rule B1 (buy YES at the bid on evening favorites; fills from the real tape)")
-    orders = list(session.scalars(select(MakerOrder)))
-    if not orders:
-        lines.append("  no orders yet (posts at 8pm local standard time the evening before each market's day)")
-    else:
-        by = {st: [o for o in orders if o.status == st] for st in ("open", "filled", "expired", "settled")}
-        done = by["settled"]
-        decided = len(done) + len(by["filled"]) + len(by["expired"])
-        fill_rate = (len(done) + len(by["filled"])) / decided if decided else 0.0
-        net = sum((o.pnl or Decimal(0) for o in done), Decimal(0))
-        per = net / sum((o.contracts for o in done), Decimal(0)) * 100 if done else Decimal(0)
-        lines.append(f"  posted {len(orders)}   open {len(by['open'])}   filled awaiting result {len(by['filled'])}   "
-                     f"expired unfilled {len(by['expired'])}   settled {len(done)}")
-        lines.append(f"  fill rate {fill_rate:.0%} (backtest 89%)   net ${net:+.2f}   {per:+.1f}c per contract "
-                     f"(backtest +7.1c)")
+    lines.extend(maker_section(session))
     lines.append("\nCOSTS AND QUOTAS")
     lines.append(f"  API spend, last 30 days: ${cost_30d:.2f}"
                  + ("   WARNING: above $10/month" if cost_30d > MONTHLY_COST_WARNING else ""))
