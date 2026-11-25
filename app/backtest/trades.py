@@ -28,27 +28,43 @@ TEST_START = date(2026, 3, 1)
 ZONES = ((0.05, 0.20), (0.65, 0.95))  # exactly K2's pre-registered rules A and B
 
 
-def candidates() -> list[dict]:
+OUT_AM = CACHE / "trades_am.jsonl"
+ZONES_AM = ((0.65, 0.95),)  # K6: B1 at 8am
+
+
+def candidates(when: str = "eve") -> list[dict]:
     prices = json.loads((CACHE / "prices.json").read_text(encoding="utf-8"))
     markets = json.loads((CACHE / "markets_kept.json").read_text(encoding="utf-8"))
+    zones = ZONES if when == "eve" else ZONES_AM
     out = []
     for m in markets:
         d = event_date(m["event_ticker"])
-        pr = (prices.get(m["ticker"]) or {}).get("eve")
+        pr = (prices.get(m["ticker"]) or {}).get(when)
         if d is None or d < TEST_START or not pr or m.get("result") not in ("yes", "no"):
             continue
         mid = (float(pr["bid"]) + float(pr["ask"])) / 2
-        if any(lo <= mid < hi for lo, hi in ZONES):
+        if any(lo <= mid < hi for lo, hi in zones):
             out.append({"ticker": m["ticker"], "min_ts": int(pr["t"]), "close_time": m.get("close_time")})
     return out
 
 
-def main(per_second: float = 8.0, workers: int = 6) -> None:
+def _tickers(path) -> set[str]:
+    out = set()
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            try:
+                out.add(json.loads(line)["ticker"])
+            except (json.JSONDecodeError, KeyError):
+                continue  # a half-written last line
+    return out
+
+
+def main(per_second: float = 8.0, workers: int = 6, when: str = "eve") -> None:
+    """when="am" (K6): only markets without an 8pm tape (which already covers 8am onwards) go to trades_am.jsonl."""
     base = get_settings().kalshi_prod_base_url
-    done = set()
-    if OUT.exists():
-        done = {json.loads(line)["ticker"] for line in OUT.read_text(encoding="utf-8").splitlines() if line}
-    todo = [c for c in candidates() if c["ticker"] not in done]
+    target = OUT if when == "eve" else OUT_AM
+    done = _tickers(OUT) | (_tickers(OUT_AM) if when == "am" else set())
+    todo = [c for c in candidates(when) if c["ticker"] not in done]
     import random
     random.Random(42).shuffle(todo)  # random order: a partial download still covers every month
     with httpx.Client(timeout=30) as http:
@@ -94,7 +110,7 @@ def main(per_second: float = 8.0, workers: int = 6) -> None:
             params["cursor"] = cur
         return {"ticker": c["ticker"], "source": path, "trades": trades}
 
-    with httpx.Client(timeout=30) as http, ThreadPoolExecutor(workers) as pool, OUT.open("a", encoding="utf-8") as fh:
+    with httpx.Client(timeout=30) as http, ThreadPoolExecutor(workers) as pool, target.open("a", encoding="utf-8") as fh:
         for i, rec in enumerate(pool.map(lambda c: fetch(c, http), todo), 1):
             with lock:
                 fh.write(json.dumps(rec) + "\n")
@@ -105,4 +121,8 @@ def main(per_second: float = 8.0, workers: int = 6) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--am" in sys.argv:
+        main(per_second=3.5, when="am")
+    else:
+        main()
